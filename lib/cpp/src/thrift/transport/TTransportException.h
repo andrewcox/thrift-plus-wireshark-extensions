@@ -47,6 +47,11 @@ class TTransportException : public apache::thrift::TException {
   , BAD_ARGS = 5
   , CORRUPTED_DATA = 6
   , INTERNAL_ERROR = 7
+  , ALREADY_OPEN = 8
+  , NOT_SUPPORTED = 9
+  , INVALID_STATE = 10
+  , INVALID_FRAME_SIZE = 11
+  , SSL_ERROR = 12
   };
 
   TTransportException() :
@@ -94,6 +99,12 @@ class TTransportException : public apache::thrift::TException {
         case BAD_ARGS       : return "TTransportException: Invalid arguments";
         case CORRUPTED_DATA : return "TTransportException: Corrupted Data";
         case INTERNAL_ERROR : return "TTransportException: Internal error";
+        case ALREADY_OPEN   : return "TTransportException: Transport already open";
+        case NOT_SUPPORTED  : return "TTransportException: Not supported";
+        case INVALID_STATE  : return "TTransportException: Invalid state";
+        case INVALID_FRAME_SIZE:
+          return "TTransportException: Invalid frame size";
+        case SSL_ERROR      : return "TTransportException: SSL error";
         default             : return "TTransportException: (Invalid exception type)";
       }
     } else {

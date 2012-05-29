@@ -151,7 +151,7 @@ uint32_t TFramedTransport::readSlow(uint8_t* buf, uint32_t len) {
   }
 
   // Read another frame.
-  if (!readFrame()) {
+  if (!readFrame(len)) {
     // EOF.  No frame available.
     return 0;
   }
@@ -167,7 +167,7 @@ uint32_t TFramedTransport::readSlow(uint8_t* buf, uint32_t len) {
   return (len - want);
 }
 
-bool TFramedTransport::readFrame() {
+bool TFramedTransport::readFrame(uint32_t minFrameSize) {
   // TODO(dreiss): Think about using readv here, even though it would
   // result in (gasp) read-ahead.
 

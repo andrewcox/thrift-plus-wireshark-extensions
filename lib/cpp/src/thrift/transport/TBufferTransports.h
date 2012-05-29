@@ -324,9 +324,11 @@ class TBufferedTransportFactory : public TTransportFactory {
  */
 class TFramedTransport
   : public TVirtualTransport<TFramedTransport, TBufferBase> {
+
  public:
 
   static const int DEFAULT_BUFFER_SIZE = 512;
+
 
   /// Use default buffer sizes.
   TFramedTransport(boost::shared_ptr<TTransport> transport)
@@ -391,13 +393,26 @@ class TFramedTransport
   }
 
  protected:
+  /// Constructor for subclassing.
+  TFramedTransport()
+    : rBufSize_(0)
+    , wBufSize_(DEFAULT_BUFFER_SIZE)
+    , rBuf_()
+    , wBuf_(new uint8_t[wBufSize_])
+  {
+    initPointers();
+  }
+
   /**
    * Reads a frame of input from the underlying stream.
    *
    * Returns true if a frame was read successfully, or false on EOF.
    * (Raises a TTransportException if EOF occurs after a partial frame.)
+   *
+   * @param req_sz   The size of the requested data.  readFrame may read more
+   *                 than this amount, but should not read less.
    */
-  bool readFrame();
+  virtual bool readFrame(uint32_t min_frame_sz);
 
   void initPointers() {
     setReadBuffer(NULL, 0);
