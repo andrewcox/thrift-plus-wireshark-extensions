@@ -20,12 +20,12 @@
 #ifndef THRIFT_TRANSPORT_THEADERTRANSPORT_H_
 #define THRIFT_TRANSPORT_THEADERTRANSPORT_H_ 1
 
-#include "thrift/lib/cpp/protocol/TBinaryProtocol.h"
-#include "thrift/lib/cpp/protocol/TProtocolTypes.h"
-#include "thrift/lib/cpp/transport/TBufferTransports.h"
-#include "thrift/lib/cpp/transport/THttpServer.h"
-#include "thrift/lib/cpp/transport/TTransport.h"
-#include "thrift/lib/cpp/transport/TVirtualTransport.h"
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TProtocolTypes.h>
+#include "TBufferTransports.h"
+#include "THttpServer.h"
+#include "TTransport.h"
+#include "TVirtualTransport.h"
 
 #include <bitset>
 #include "boost/scoped_array.hpp"

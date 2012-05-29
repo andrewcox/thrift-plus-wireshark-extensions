@@ -20,14 +20,15 @@
 #ifndef _THRIFT_PROTOCOL_THEADERPROTOCOL_H_
 #define _THRIFT_PROTOCOL_THEADERPROTOCOL_H_ 1
 
-#include "thrift/lib/cpp/protocol/TProtocol.h"
-#include "thrift/lib/cpp/protocol/TProtocolTypes.h"
-#include "thrift/lib/cpp/protocol/TVirtualProtocol.h"
-#include "thrift/lib/cpp/transport/THeaderTransport.h"
+#include "TProtocol.h"
+#include "TProtocolTypes.h"
+#include "TVirtualProtocol.h"
+#include <thrift/transport/THeaderTransport.h>
 
 #include <bitset>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 using apache::thrift::transport::THeaderTransport;
 
 namespace apache { namespace thrift { namespace protocol {
@@ -45,25 +46,8 @@ class THeaderProtocol
 
   THeaderProtocol(const boost::shared_ptr<TTransport>& trans,
                   std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
-      TVirtualProtocol<THeaderProtocol>(new THeaderTransport(trans,
-                                                             clientTypes))
-    , trans_((THeaderTransport*)this->getTransport().get())
-    , protoId(T_BINARY_PROTOCOL)
-    {
-      resetProtocol();
-    }
-
-  /**
-   * Construct a THeaderProtocol using a raw pointer to the transport.
-   *
-   * The caller is responsible for ensuring that the transport remains valid
-   * for the lifetime of the protocol.
-   */
-  THeaderProtocol(TTransport* trans,
-                  std::bitset<CLIENT_TYPES_LEN>* clientTypes) :
-      TVirtualProtocol<THeaderProtocol>(
-        new THeaderTransport(boost::shared_ptr<TTransport>(trans),
-                             clientTypes))
+    TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(trans,
+                                                                           clientTypes))
     , trans_((THeaderTransport*)this->getTransport().get())
     , protoId(T_BINARY_PROTOCOL)
     {
@@ -180,8 +164,7 @@ class THeaderProtocol
   uint32_t readBinary(std::string& binary);
 
  protected:
-  template<typename StrType>
-  uint32_t readStringBody(StrType& str, int32_t sz);
+  uint32_t readStringBody(std::string& str, int32_t sz);
 
   boost::shared_ptr<THeaderTransport> trans_;
 

@@ -31,4 +31,3 @@ enum PROTOCOL_TYPES {
 }}} // apache::thrift::protocol
 
 #endif // #define _THRIFT_PROTOCOL_TPROTOCOLTYPES_H_ 1
-

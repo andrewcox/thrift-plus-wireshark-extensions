@@ -63,6 +63,7 @@ libthrift_la_SOURCES = src/thrift/Thrift.cpp \
                        src/thrift/protocol/TDenseProtocol.cpp \
                        src/thrift/protocol/TJSONProtocol.cpp \
                        src/thrift/protocol/TBase64Utils.cpp \
+                       src/thrift/protocol/THeaderProtocol.cpp \
                        src/thrift/transport/TTransportException.cpp \
                        src/thrift/transport/TFDTransport.cpp \
                        src/thrift/transport/TFileTransport.cpp \
@@ -79,12 +80,14 @@ libthrift_la_SOURCES = src/thrift/Thrift.cpp \
                        src/thrift/transport/TSSLServerSocket.cpp \
                        src/thrift/transport/TTransportUtils.cpp \
                        src/thrift/transport/TBufferTransports.cpp \
+                       src/thrift/transport/THeaderTransport.cpp \
                        src/thrift/server/TServer.cpp \
                        src/thrift/server/TSimpleServer.cpp \
                        src/thrift/server/TThreadPoolServer.cpp \
                        src/thrift/server/TThreadedServer.cpp \
                        src/thrift/async/TAsyncChannel.cpp \
-                       src/thrift/processor/PeekProcessor.cpp
+                       src/thrift/processor/PeekProcessor.cpp \
+                       src/thrift/util/VarintUtils.cpp
 
 if WITH_BOOSTTHREADS
 libthrift_la_SOURCES += src/thrift/concurrency/BoostThreadFactory.cpp \
@@ -99,7 +102,7 @@ endif
 libthriftnb_la_SOURCES = src/thrift/server/TNonblockingServer.cpp \
                          src/thrift/async/TAsyncProtocolProcessor.cpp \
                          src/thrift/async/TEvhttpServer.cpp \
-                         src/thrift/async/TEvhttpClientChannel.cpp 
+                         src/thrift/async/TEvhttpClientChannel.cpp
 
 libthriftz_la_SOURCES = src/thrift/transport/TZlibTransport.cpp
 
@@ -146,6 +149,8 @@ include_concurrency_HEADERS = \
 
 include_protocoldir = $(include_thriftdir)/protocol
 include_protocol_HEADERS = \
+                         src/thrift/protocol/THeaderProtocol.h \
+                         src/thrift/protocol/TProtocolTypes.h \
                          src/thrift/protocol/TBinaryProtocol.h \
                          src/thrift/protocol/TBinaryProtocol.tcc \
                          src/thrift/protocol/TCompactProtocol.h \
@@ -161,6 +166,7 @@ include_protocol_HEADERS = \
 
 include_transportdir = $(include_thriftdir)/transport
 include_transport_HEADERS = \
+                         src/thrift/transport/THeaderTransport.h \
                          src/thrift/transport/TFDTransport.h \
                          src/thrift/transport/TFileTransport.h \
                          src/thrift/transport/TSimpleFileTransport.h \
@@ -210,6 +216,10 @@ include_qtdir = $(include_thriftdir)/qt
 include_qt_HEADERS = \
                   src/thrift/qt/TQIODeviceTransport.h \
                   src/thrift/qt/TQTcpServer.h
+
+include_utildir = $(include_thriftdir)/util
+include_util_HEADERS = \
+                    src/thrift/util/VarintUtils.h
 
 THRIFT = $(top_builddir)/compiler/cpp/thrift
 

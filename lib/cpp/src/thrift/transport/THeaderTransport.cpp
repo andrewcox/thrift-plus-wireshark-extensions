@@ -17,10 +17,10 @@
  * under the License.
  */
 
-#include "thrift/lib/cpp/TApplicationException.h"
-#include "thrift/lib/cpp/protocol/TProtocolTypes.h"
-#include "thrift/lib/cpp/transport/THeaderTransport.h"
-#include "thrift/lib/cpp/util/VarintUtils.h"
+#include <thrift/TApplicationException.h>
+#include <thrift/protocol/TProtocolTypes.h>
+#include "THeaderTransport.h"
+#include <thrift/util/VarintUtils.h>
 
 #include <algorithm>
 #include <bitset>

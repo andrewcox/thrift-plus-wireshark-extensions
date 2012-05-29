@@ -19,10 +19,10 @@
 #ifndef _THRIFT_PROTOCOL_THEADERPROTOCOL_CPP_
 #define _THRIFT_PROTOCOL_THEADERPROTOCOL_CPP_ 1
 
-#include "thrift/lib/cpp/protocol/TCompactProtocol.h"
-#include "thrift/lib/cpp/protocol/TJSONProtocol.h"
-#include "thrift/lib/cpp/protocol/THeaderProtocol.h"
-#include "thrift/lib/cpp/TApplicationException.h"
+#include "TCompactProtocol.h"
+#include "TJSONProtocol.h"
+#include "THeaderProtocol.h"
+#include <thrift/TApplicationException.h>
 
 #include <limits>
 #include <boost/static_assert.hpp>
@@ -251,12 +251,6 @@ uint32_t THeaderProtocol::readString(std::string& str) {
 
 uint32_t THeaderProtocol::readBinary(std::string& binary) {
   return proto_->readBinary(binary);
-}
-
-template<typename StrType>
-uint32_t THeaderProtocol::readStringBody(StrType& str,
-                                         int32_t size) {
-  return proto_->readStringBody<StrType>(str, size);
 }
 
 }}} // apache::thrift::protocol
