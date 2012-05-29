@@ -79,6 +79,7 @@ class THeaderTransport
   /// Use default buffer sizes.
   THeaderTransport(const boost::shared_ptr<TTransport> transport)
     : transport_(transport)
+    , outTransport_(transport)
     , protoId(T_COMPACT_PROTOCOL)
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , httpTransport_(transport)
@@ -92,6 +93,7 @@ class THeaderTransport
   THeaderTransport(const boost::shared_ptr<TTransport> transport,
                    std::bitset<CLIENT_TYPES_LEN> const* clientTypes)
     : transport_(transport)
+    , outTransport_(transport)
     , protoId(T_COMPACT_PROTOCOL)
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , httpTransport_(transport)
@@ -102,9 +104,25 @@ class THeaderTransport
     initSupportedClients(clientTypes);
   }
 
+  THeaderTransport(const boost::shared_ptr<TTransport> inTransport,
+                   const boost::shared_ptr<TTransport> outTransport,
+                   std::bitset<CLIENT_TYPES_LEN> const* clientTypes)
+    : transport_(inTransport)
+    , outTransport_(outTransport)
+    , protoId(T_COMPACT_PROTOCOL)
+    , clientType(THRIFT_HEADER_CLIENT_TYPE)
+    , httpTransport_(outTransport)
+    , tBufSize_(0)
+    , tBuf_(NULL)
+  {
+    initBuffers();
+    initSupportedClients(clientTypes);
+  }
+
   THeaderTransport(const boost::shared_ptr<TTransport> transport, uint32_t sz,
                    std::bitset<CLIENT_TYPES_LEN> const* clientTypes)
     : transport_(transport)
+    , outTransport_(transport)
     , protoId(T_COMPACT_PROTOCOL)
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , httpTransport_(transport)
@@ -214,6 +232,7 @@ class THeaderTransport
   }
 
   boost::shared_ptr<TTransport> transport_;
+  boost::shared_ptr<TTransport> outTransport_;
 
   // 0 and 16th bits must be 0 to differentiate from framed & unframed
   static const uint32_t HEADER_MAGIC = 0x0FFF0000;

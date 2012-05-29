@@ -413,15 +413,24 @@ void TNonblockingServer::TConnection::init(int socket,
 
   // get input/transports
   factoryInputTransport_ = server_->getInputTransportFactory()->getTransport(
-                             inputTransport_);
+    boost::shared_ptr<TTransport>(inputTransport_));
   factoryOutputTransport_ = server_->getOutputTransportFactory()->getTransport(
-                             outputTransport_);
-
-  // Create protocol
-  inputProtocol_ = server_->getInputProtocolFactory()->getProtocol(
-                     factoryInputTransport_);
-  outputProtocol_ = server_->getOutputProtocolFactory()->getProtocol(
-                     factoryOutputTransport_);
+    boost::shared_ptr<TTransport>(outputTransport_));
+  if (!server_->getOutputProtocolFactory()) {
+    // Create protocol
+    THeaderProtocolFactory* protFactory =
+      dynamic_cast<THeaderProtocolFactory*>(
+        server_->getInputProtocolFactory().get());
+    inputProtocol_ = protFactory->getProtocol(factoryInputTransport_,
+                                              factoryOutputTransport_);
+    outputProtocol_ = inputProtocol_;
+  } else {
+    // Create protocol
+    inputProtocol_ = server_->getInputProtocolFactory()->getProtocol(
+      factoryInputTransport_);
+    outputProtocol_ = server_->getOutputProtocolFactory()->getProtocol(
+      factoryOutputTransport_);
+  }
 
   // Set up for any server event handler
   serverEventHandler_ = server_->getEventHandler();
@@ -579,12 +588,26 @@ void TNonblockingServer::TConnection::transition() {
   case APP_READ_REQUEST:
     // We are done reading the request, package the read buffer into transport
     // and get back some data from the dispatch function
-    inputTransport_->resetBuffer(readBuffer_, readBufferPos_);
-    outputTransport_->resetBuffer();
-    // Prepend four bytes of blank space to the buffer so we can
-    // write the frame size there later.
-    outputTransport_->getWritePtr(4);
-    outputTransport_->wroteBytes(4);
+    if (!server_->getOutputProtocolFactory()) {
+      // Keep the frame size 4 byte field, and send it to the underlying
+      // transport.  THeaderTransport uses this to do bulk copying instead of
+      // reading individual bytes.
+      inputTransport_->resetBuffer(readBuffer_, readBufferPos_);
+      outputTransport_->resetBuffer();
+    } else {
+      // Don't send frame to underlying transport.  TBinaryProtocol was designed
+      // to read individual bytes from this buffer, no extra copy needed (which
+      // makes it slightly faster than the above THeaderFormat version).
+      inputTransport_->resetBuffer(readBuffer_ + 4, readBufferPos_ - 4);
+      outputTransport_->resetBuffer();
+      // Save space for the framing bytes in the output.  TBinaryProtocol
+      // doesn't add these by default, the above THeader format does.
+
+      // Note that the TNonblockingServer adds an implicit TFramedTransport
+      // around the transportfactory you provide, no need to add your own.
+      outputTransport_->getWritePtr(4);
+      outputTransport_->wroteBytes(4);
+    }
 
     server_->incrementActiveProcessors();
 
@@ -720,6 +743,9 @@ void TNonblockingServer::TConnection::transition() {
   case APP_READ_FRAME_SIZE:
     // We just read the request length
     // Double the buffer size until it is big enough
+
+    readWant_ += 4; // Save room for the frame size.
+
     if (readWant_ > readBufferSize_) {
       if (readBufferSize_ == 0) {
         readBufferSize_ = 1;
@@ -738,7 +764,8 @@ void TNonblockingServer::TConnection::transition() {
       readBufferSize_ = newSize;
     }
 
-    readBufferPos_= 0;
+    // Pass the size to the underlying THeaderTransport
+    *((uint32_t*)readBuffer_) = htonl(readWant_ - 4);
 
     // Move into read request state
     socketState_ = SOCKET_RECV;

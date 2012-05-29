@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef _THRIFT_PROTOCOL_THEADERPROTOCOL_H_
-#define _THRIFT_PROTOCOL_THEADERPROTOCOL_H_ 1
+#ifndef THRIFT_PROTOCOL_THEADERPROTOCOL_H_
+#define THRIFT_PROTOCOL_THEADERPROTOCOL_H_ 1
 
 #include "TProtocol.h"
 #include "TProtocolTypes.h"
@@ -56,6 +56,18 @@ class THeaderProtocol
 
   ~THeaderProtocol() {}
 
+
+  THeaderProtocol(const boost::shared_ptr<TTransport>& inTrans,
+                  const boost::shared_ptr<TTransport>& outTrans,
+                  std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
+      TVirtualProtocol<THeaderProtocol>(new THeaderTransport(inTrans,
+                                                             outTrans,
+                                                             clientTypes))
+    , trans_((THeaderTransport*)this->getTransport().get())
+    , protoId(T_BINARY_PROTOCOL)
+    {
+      resetProtocol();
+    }
 
   /**
    * Writing functions.
@@ -194,10 +206,18 @@ class THeaderProtocolFactory : public TProtocolFactory {
     return boost::shared_ptr<TProtocol>(prot);
   }
 
+  boost::shared_ptr<TProtocol> getProtocol(
+      boost::shared_ptr<transport::TTransport> inTrans,
+      boost::shared_ptr<transport::TTransport> outTrans) {
+    TProtocol* prot = new THeaderProtocol(inTrans, outTrans, &clientTypes);
+
+    return boost::shared_ptr<TProtocol>(prot);
+  }
+
  private:
   std::bitset<CLIENT_TYPES_LEN> clientTypes;
 };
 
 }}} // apache::thrift::protocol
 
-#endif // #ifndef _THRIFT_PROTOCOL_THEADERPROTOCOL_H_
+#endif // #ifndef THRIFT_PROTOCOL_THEADERPROTOCOL_H_

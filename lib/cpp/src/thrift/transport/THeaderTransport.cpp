@@ -425,16 +425,16 @@ void THeaderTransport::flush()  {
     *reinterpret_cast<uint32_t*>(pktStart) = htonl(szHbo);
     *reinterpret_cast<uint16_t*>(headerPtr) = htons(headerSize / 4);
 
-    transport_->write(pktStart, szHbo - haveBytes + 4);
-    transport_->write(wBuf_.get(), haveBytes);
+    outTransport_->write(pktStart, szHbo - haveBytes + 4);
+    outTransport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_FRAMED_DEPRECATED) {
     uint32_t szHbo = (uint32_t)haveBytes;
     uint32_t szNbo = htonl(szHbo);
 
-    transport_->write(reinterpret_cast<uint8_t*>(&szNbo), 4);
-    transport_->write(wBuf_.get(), haveBytes);
+    outTransport_->write(reinterpret_cast<uint8_t*>(&szNbo), 4);
+    outTransport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_UNFRAMED_DEPRECATED) {
-    transport_->write(wBuf_.get(), haveBytes);
+    outTransport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_HTTP_CLIENT_TYPE) {
     httpTransport_.write(wBuf_.get(), haveBytes);
     httpTransport_.flush();
@@ -444,7 +444,7 @@ void THeaderTransport::flush()  {
   }
 
   // Flush the underlying transport.
-  transport_->flush();
+  outTransport_->flush();
 }
 
 }}} // apache::thrift::transport
