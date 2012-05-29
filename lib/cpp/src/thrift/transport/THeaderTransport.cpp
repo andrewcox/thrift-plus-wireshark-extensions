@@ -137,8 +137,6 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
     }
   } else if (sz == HTTP_MAGIC) {
     clientType = THRIFT_HTTP_CLIENT_TYPE;
-    *reinterpret_cast<uint32_t*>(rBuf_.get()) = szN;
-    setReadBuffer(rBuf_.get(), 4);
   } else {
     // Could be header format or framed. Check next uint32
     uint32_t magic_n;
@@ -335,11 +333,6 @@ void THeaderTransport::transform(uint8_t* ptr, uint32_t sz) {
 }
 
 void THeaderTransport::resetProtocol() {
-  // HTTP requires a response on one-way.
-  if (clientType == THRIFT_HTTP_CLIENT_TYPE) {
-    flush();
-  }
-
   // Set to anything except HTTP type so we don't flush again
   clientType = THRIFT_HEADER_CLIENT_TYPE;
 

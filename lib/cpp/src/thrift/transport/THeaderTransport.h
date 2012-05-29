@@ -57,6 +57,7 @@ class THttpHeaderServer : public THttpServer {
     // POST - because we read this earlier, need to put it back.
     *((uint32_t*)httpBuf_) = 0x54534F50;
     httpBufLen_ += 4;
+    httpPos_ = 0;
     THttpTransport::refill();
   }
 };
