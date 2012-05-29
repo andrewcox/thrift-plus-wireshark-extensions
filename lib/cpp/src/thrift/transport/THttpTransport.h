@@ -17,8 +17,8 @@
  * under the License.
  */
 
-#ifndef _THRIFT_TRANSPORT_THTTPTRANSPORT_H_
-#define _THRIFT_TRANSPORT_THTTPTRANSPORT_H_ 1
+#ifndef THRIFT_TRANSPORT_THTTPTRANSPORT_H_
+#define THRIFT_TRANSPORT_THTTPTRANSPORT_H_ 1
 
 #include <thrift/transport/TBufferTransports.h>
 #include "TVirtualTransport.h"
@@ -95,7 +95,7 @@ class THttpTransport : public TVirtualTransport<THttpTransport> {
 
   uint32_t readContent(uint32_t size);
 
-  void refill();
+  virtual void refill();
   void shift();
 
   static const char* CRLF;
@@ -104,4 +104,4 @@ class THttpTransport : public TVirtualTransport<THttpTransport> {
 
 }}} // apache::thrift::transport
 
-#endif // #ifndef _THRIFT_TRANSPORT_THTTPCLIENT_H_
+#endif // #ifndef THRIFT_TRANSPORT_THTTPCLIENT_H_

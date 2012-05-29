@@ -131,8 +131,10 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
     *reinterpret_cast<uint32_t*>(rBuf_.get()) = szN;
     if (minFrameSize > 4) {
       transport_->readAll(rBuf_.get() + 4, minFrameSize - 4);
+      setReadBuffer(rBuf_.get(), minFrameSize);
+    } else {
+      setReadBuffer(rBuf_.get(), 4);
     }
-    setReadBuffer(rBuf_.get(), minFrameSize);
   } else if (sz == HTTP_MAGIC) {
     clientType = THRIFT_HTTP_CLIENT_TYPE;
     *reinterpret_cast<uint32_t*>(rBuf_.get()) = szN;
@@ -217,6 +219,9 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
 }
 
 void THeaderTransport::untransform(uint8_t* ptr, uint32_t sz) {
+  // Update the transform buffer size if needed
+  resizeTransformBuffer();
+
   for (vector<uint16_t>::const_iterator it = read_trans.begin();
        it != read_trans.end(); ++it) {
     const uint16_t transId = *it;
@@ -262,9 +267,28 @@ void THeaderTransport::untransform(uint8_t* ptr, uint32_t sz) {
   setReadBuffer(ptr, sz);
 }
 
+/**
+ * We may have updated the wBuf size, update the tBuf size to match.
+ * Should be called in transform.
+ *
+ * The buffer should be slightly larger than write buffer size due to
+ * compression transforms (that may slightly grow on small frame sizes)
+ */
+void THeaderTransport::resizeTransformBuffer() {
+  if (tBufSize_ < wBufSize_ + DEFAULT_BUFFER_SIZE) {
+    uint32_t new_size = wBufSize_ + DEFAULT_BUFFER_SIZE;
+    uint8_t* new_buf = new uint8_t[new_size];
+    tBuf_.reset(new_buf);
+    tBufSize_ = new_size;
+  }
+}
+
 void THeaderTransport::transform(uint8_t* ptr, uint32_t sz) {
   // TODO(davejwatson) look at doing these as stream operations on write
   // instead of memory buffer operations.  Would save a memcpy.
+
+  // Update the transform buffer size if needed
+  resizeTransformBuffer();
 
   for (vector<uint16_t>::const_iterator it = write_trans.begin();
        it != write_trans.end(); ++it) {
@@ -330,7 +354,6 @@ uint32_t THeaderTransport::getWriteBytes() {
 void THeaderTransport::flush()  {
   // Write out any data waiting in the write buffer.
   uint32_t haveBytes = getWriteBytes();
-  uint8_t* pktStart = NULL;
 
   if (clientType == THRIFT_HEADER_CLIENT_TYPE) {
     transform(wBuf_.get(), haveBytes);
@@ -347,8 +370,7 @@ void THeaderTransport::flush()  {
                               "Trying to send JSON without HTTP");
   }
 
-  if (haveBytes > MAX_FRAME_SIZE ||
-      haveBytes > tBufSize_) {
+  if (haveBytes > MAX_FRAME_SIZE) {
     throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
                               "Attempting to send frame that is too large");
   }
@@ -360,7 +382,7 @@ void THeaderTransport::flush()  {
     uint32_t maxSzHbo = headerSize + haveBytes + 4; // Pkt size
     uint8_t* pkt = tBuf_.get();
     uint8_t* headerPtr;
-    pktStart = pkt;
+    uint8_t* pktStart = pkt;
 
     if (maxSzHbo > tBufSize_) {
       throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
@@ -406,18 +428,13 @@ void THeaderTransport::flush()  {
     transport_->write(pktStart, szHbo - haveBytes + 4);
     transport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_FRAMED_DEPRECATED) {
-    int32_t szHbo = haveBytes;
-    uint8_t *pkt = tBuf_.get();
-    pktStart = pkt;
+    uint32_t szHbo = (uint32_t)haveBytes;
+    uint32_t szNbo = htonl(szHbo);
 
-    *reinterpret_cast<uint32_t*>(pkt) = (int32_t)htonl((uint32_t)szHbo);
-    pkt += 4;
-
-    transport_->write(pktStart, szHbo - haveBytes + 4);
+    transport_->write(reinterpret_cast<uint8_t*>(&szNbo), 4);
     transport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_UNFRAMED_DEPRECATED) {
-    pktStart = wBuf_.get();
-    transport_->write(pktStart, haveBytes);
+    transport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_HTTP_CLIENT_TYPE) {
     httpTransport_.write(wBuf_.get(), haveBytes);
     httpTransport_.flush();

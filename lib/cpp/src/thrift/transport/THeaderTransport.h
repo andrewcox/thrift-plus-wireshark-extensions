@@ -82,8 +82,8 @@ class THeaderTransport
     , protoId(T_COMPACT_PROTOCOL)
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , httpTransport_(transport)
-    , tBufSize_(wBufSize_ + DEFAULT_BUFFER_SIZE)
-    , tBuf_(new uint8_t[tBufSize_])
+    , tBufSize_(0)
+    , tBuf_(NULL)
   {
     initBuffers();
     initSupportedClients(NULL);
@@ -95,8 +95,8 @@ class THeaderTransport
     , protoId(T_COMPACT_PROTOCOL)
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , httpTransport_(transport)
-    , tBufSize_(wBufSize_ + DEFAULT_BUFFER_SIZE)
-    , tBuf_(new uint8_t[tBufSize_])
+    , tBufSize_(0)
+    , tBuf_(NULL)
   {
     initBuffers();
     initSupportedClients(clientTypes);
@@ -108,8 +108,8 @@ class THeaderTransport
     , protoId(T_COMPACT_PROTOCOL)
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , httpTransport_(transport)
-    , tBufSize_(wBufSize_ + DEFAULT_BUFFER_SIZE)
-    , tBuf_(new uint8_t[tBufSize_])
+    , tBufSize_(0)
+    , tBuf_(NULL)
   {
     initBuffers();
     initSupportedClients(clientTypes);
@@ -134,8 +134,9 @@ class THeaderTransport
 
   virtual uint32_t readSlow(uint8_t* buf, uint32_t len);
   virtual uint32_t readAll(uint8_t* buf, uint32_t len);
-
   virtual void flush();
+
+  void resizeTransformBuffer();
 
   boost::shared_ptr<TTransport> getUnderlyingTransport() {
     return transport_;
