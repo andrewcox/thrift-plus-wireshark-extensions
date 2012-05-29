@@ -46,8 +46,8 @@ class THeaderProtocol
 
   THeaderProtocol(const boost::shared_ptr<TTransport>& trans,
                   std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
-    TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(trans,
-                                                                           clientTypes))
+      TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(trans,
+                                                                             clientTypes))
     , trans_((THeaderTransport*)this->getTransport().get())
     , protoId(T_BINARY_PROTOCOL)
     {
@@ -60,9 +60,9 @@ class THeaderProtocol
   THeaderProtocol(const boost::shared_ptr<TTransport>& inTrans,
                   const boost::shared_ptr<TTransport>& outTrans,
                   std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
-      TVirtualProtocol<THeaderProtocol>(new THeaderTransport(inTrans,
-                                                             outTrans,
-                                                             clientTypes))
+      TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(inTrans,
+									     outTrans,
+									     clientTypes))
     , trans_((THeaderTransport*)this->getTransport().get())
     , protoId(T_BINARY_PROTOCOL)
     {
