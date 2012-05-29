@@ -212,8 +212,6 @@ class THeaderTransport
 
   std::bitset<CLIENT_TYPES_LEN> supported_clients;
 
-  uint32_t readInt32(uint8_t** ptr, uint8_t* boundary);
-
   void initSupportedClients(std::bitset<CLIENT_TYPES_LEN> const*);
 
   /**
@@ -238,7 +236,7 @@ class THeaderTransport
   // 0 and 16th bits must be 0 to differentiate from framed & unframed
   static const uint32_t HEADER_MAGIC = 0x0FFF0000;
   static const uint32_t HEADER_MASK = 0xFFFF0000;
-  static const uint32_t HEADER_SIZE_MASK = 0x0000FFFF;
+  static const uint32_t FLAGS_MASK = 0x0000FFFF;
   static const uint32_t HTTP_MAGIC = 0x504F5354; // POST
 
   static const uint32_t MAX_FRAME_SIZE = 0x3FFFFFFF;
@@ -246,6 +244,7 @@ class THeaderTransport
   int16_t protoId;
   uint16_t clientType;
   uint32_t seqId;
+  uint16_t flags;
 
   std::vector<uint16_t> read_trans;
   std::vector<uint16_t> write_trans;

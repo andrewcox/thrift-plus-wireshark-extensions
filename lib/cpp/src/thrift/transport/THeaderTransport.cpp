@@ -36,16 +36,6 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::util;
 using apache::thrift::protocol::TBinaryProtocol;
 
-uint32_t THeaderTransport::readInt32(uint8_t** ptr, uint8_t* boundary) {
-  if (*ptr + 4 > boundary) {
-    throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
-                                  "Tried to read past header");
-  }
-  uint32_t ret = ntohl((*reinterpret_cast<uint32_t*>(*ptr)));
-  (*ptr) += 4;
-  return ret;
-}
-
 void THeaderTransport::initSupportedClients(std::bitset<CLIENT_TYPES_LEN>
                                             const* clients) {
   if (clients) {
@@ -161,14 +151,25 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
     } else if (HEADER_MAGIC == (magic & HEADER_MASK)) {
       // header format
       clientType = THRIFT_HEADER_CLIENT_TYPE;
-      uint16_t headerSize = magic & HEADER_SIZE_MASK;
+      // flags
+      flags = magic & FLAGS_MASK;
+      // seqId
+      uint32_t seqId_n;
+      transport_->readAll(reinterpret_cast<uint8_t*>(&seqId_n),
+          sizeof(seqId_n));
+      seqId = ntohl(seqId_n);
+      // header size
+      uint16_t headerSize_n;
+      transport_->readAll(reinterpret_cast<uint8_t*>(&headerSize_n),
+          sizeof(headerSize_n));
+      uint16_t headerSize = ntohs(headerSize_n);
       if (sz > MAX_FRAME_SIZE) {
         throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
                                   "Header transport frame was too large");
       }
-      transport_->readAll(rBuf_.get(), sz - 4);
-      setReadBuffer(rBuf_.get(), sz - 4);
-      readHeaderFormat(headerSize, sz - 4);
+      transport_->readAll(rBuf_.get(), sz - 10);
+      setReadBuffer(rBuf_.get(), sz - 10);
+      readHeaderFormat(headerSize, sz - 10);
     } else {
       clientType = THRIFT_UNKNOWN_CLIENT_TYPE;
       throw TTransportException(TTransportException::BAD_ARGS,
@@ -193,7 +194,6 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
     throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
                               "Header size is larger than frame");
   }
-  seqId = readInt32(&ptr, headerBoundary);
   ptr += readVarint16(ptr, &protoId, headerBoundary);
   int16_t headerCount;
   ptr += readVarint16(ptr, &headerCount, headerBoundary);
@@ -371,7 +371,7 @@ void THeaderTransport::flush()  {
   if (clientType == THRIFT_HEADER_CLIENT_TYPE) {
     // header size will need to be updated at the end because of varints.
     // Make it big enough here for max varint size, plus 4 for padding.
-    int headerSize = 4 + (2 + getNumTransforms()) * 5 + 4;
+    int headerSize = (2 + getNumTransforms()) * 5 + 4;
     uint32_t maxSzHbo = headerSize + haveBytes + 4; // Pkt size
     uint8_t* pkt = tBuf_.get();
     uint8_t* headerPtr;
@@ -386,11 +386,13 @@ void THeaderTransport::flush()  {
     pkt += 4;
     *reinterpret_cast<uint16_t*>(pkt) = htons(HEADER_MAGIC >> 16);
     pkt += 2;
-    headerPtr = pkt;
-    // Fixup headerPtr later
+    *reinterpret_cast<uint16_t*>(pkt) = htons(flags);
     pkt += 2;
     *reinterpret_cast<uint32_t*>(pkt) = htonl(seqId);
     pkt += 4;
+    headerPtr = pkt;
+    // Fixup headerPtr later
+    pkt += 2;
 
     pkt += writeVarint32(protoId, pkt);
     pkt += writeVarint32(getNumTransforms(), pkt);
@@ -405,7 +407,7 @@ void THeaderTransport::flush()  {
     // See code in TBufferTransports
 
     // Fixups after varint size calculations
-    headerSize = (pkt - pktStart) - 8;
+    headerSize = (pkt - pktStart) - 14;
     uint8_t padding = 4 - (headerSize % 4);
     headerSize += padding;
 
@@ -414,7 +416,7 @@ void THeaderTransport::flush()  {
       *(pkt++) = 0x00;
     }
 
-    uint32_t szHbo = headerSize + haveBytes + 4; // Pkt size
+    uint32_t szHbo = headerSize + haveBytes + 10; // Pkt size
     *reinterpret_cast<uint32_t*>(pktStart) = htonl(szHbo);
     *reinterpret_cast<uint16_t*>(headerPtr) = htons(headerSize / 4);
 
