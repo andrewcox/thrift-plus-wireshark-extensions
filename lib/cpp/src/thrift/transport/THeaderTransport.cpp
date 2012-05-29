@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <bitset>
 #include <cassert>
+#include <string>
 #include <zlib.h>
 
 using std::string;
@@ -118,7 +119,7 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
   if ((sz & TBinaryProtocol::VERSION_MASK) == TBinaryProtocol::VERSION_1) {
     // unframed
     clientType = THRIFT_UNFRAMED_DEPRECATED;
-    *reinterpret_cast<uint32_t*>(rBuf_.get()) = szN;
+    memcpy(rBuf_.get(), &szN, sizeof(szN));
     if (minFrameSize > 4) {
       transport_->readAll(rBuf_.get() + 4, minFrameSize - 4);
       setReadBuffer(rBuf_.get(), minFrameSize);
@@ -145,7 +146,7 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
         throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
                                   "Header transport frame was too large");
       }
-      *reinterpret_cast<uint32_t*>(rBuf_.get()) = magic_n;
+      memcpy(rBuf_.get(), &magic_n, sizeof(magic_n));
       transport_->readAll(rBuf_.get() + 4, sz - 4);
       setReadBuffer(rBuf_.get(), sz);
     } else if (HEADER_MAGIC == (magic & HEADER_MASK)) {
@@ -382,17 +383,24 @@ void THeaderTransport::flush()  {
                                 "Attempting to header frame that is too large");
     }
 
+    uint32_t szHbo;
+    uint32_t szNbo;
+    uint16_t headerSizeN;
+
     // Fixup szHbo later
-    pkt += 4;
-    *reinterpret_cast<uint16_t*>(pkt) = htons(HEADER_MAGIC >> 16);
-    pkt += 2;
-    *reinterpret_cast<uint16_t*>(pkt) = htons(flags);
-    pkt += 2;
-    *reinterpret_cast<uint32_t*>(pkt) = htonl(seqId);
-    pkt += 4;
+    pkt += sizeof(szHbo);
+    uint16_t headerN = htons(HEADER_MAGIC >> 16);
+    memcpy(pkt, &headerN, sizeof(headerN));
+    pkt += sizeof(headerN);
+    uint16_t flagsN = htons(flags);
+    memcpy(pkt, &flagsN, sizeof(flagsN));
+    pkt += sizeof(flagsN);
+    uint32_t seqIdN = htonl(seqId);
+    memcpy(pkt, &seqIdN, sizeof(seqIdN));
+    pkt += sizeof(seqIdN);
     headerPtr = pkt;
-    // Fixup headerPtr later
-    pkt += 2;
+    // Fixup headerSizeN later
+    pkt += sizeof(headerSizeN);
 
     pkt += writeVarint32(protoId, pkt);
     pkt += writeVarint32(getNumTransforms(), pkt);
@@ -416,9 +424,11 @@ void THeaderTransport::flush()  {
       *(pkt++) = 0x00;
     }
 
-    uint32_t szHbo = headerSize + haveBytes + 10; // Pkt size
-    *reinterpret_cast<uint32_t*>(pktStart) = htonl(szHbo);
-    *reinterpret_cast<uint16_t*>(headerPtr) = htons(headerSize / 4);
+    szHbo = headerSize + haveBytes + 10; // Pkt size
+    szNbo = htonl(szHbo);
+    memcpy(pktStart, &szNbo, sizeof(szNbo));
+    headerSizeN = htons(headerSize / 4);
+    memcpy(headerPtr, &headerSizeN, sizeof(headerSizeN));
 
     outTransport_->write(pktStart, szHbo - haveBytes + 4);
     outTransport_->write(wBuf_.get(), haveBytes);

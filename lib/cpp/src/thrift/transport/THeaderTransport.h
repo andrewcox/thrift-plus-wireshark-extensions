@@ -55,8 +55,9 @@ class THttpHeaderServer : public THttpServer {
 
   void refill() {
     // POST - because we read this earlier, need to put it back.
-    *((uint32_t*)httpBuf_) = 0x54534F50;
-    httpBufLen_ += 4;
+    uint32_t postBytes = 0x54534F50;
+    memcpy(httpBuf_, &postBytes, sizeof(postBytes));
+    httpBufLen_ = sizeof(postBytes);
     httpPos_ = 0;
     THttpTransport::refill();
   }
