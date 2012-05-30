@@ -79,6 +79,30 @@ class THeaderProtocol
 
   /*ol*/ uint32_t writeMessageEnd();
 
+  /**
+   * Functions to work with headers by calling into THeaderTransport
+   */
+
+  typedef THeaderTransport::StringToStringMap StringToStringMap;
+
+  // these work with write headers
+  void setHeader(const std::string& key, const std::string& value) {
+    trans_->setHeader(key, value);
+  }
+
+  void clearHeaders() {
+    trans_->clearHeaders();
+  }
+
+  StringToStringMap& getWriteHeaders() {
+    return trans_->getWriteHeaders();
+  }
+
+  // these work with read headers
+  const StringToStringMap& getHeaders() const {
+    return trans_->getHeaders();
+  }
+
 
   uint32_t writeStructBegin(const char* name);
 

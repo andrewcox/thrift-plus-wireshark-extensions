@@ -213,6 +213,24 @@ class THeaderTransport
 
   void setTransform(uint16_t transId) { writeTrans_.push_back(transId); }
 
+  // Info headers
+
+  typedef std::map<std::string, std::string> StringToStringMap;
+
+  // these work with write headers
+  void setHeader(const std::string& key, const std::string& value);
+
+  void clearHeaders();
+
+  StringToStringMap& getWriteHeaders() {
+    return writeHeaders_;
+  }
+
+  // these work with read headers
+  const StringToStringMap& getHeaders() const {
+    return readHeaders_;
+  }
+
   enum TRANSFORMS {
     ZLIB_TRANSFORM = 0x01,
   };
@@ -257,6 +275,23 @@ class THeaderTransport
 
   std::vector<uint16_t> readTrans_;
   std::vector<uint16_t> writeTrans_;
+
+  // Map to use for headers
+  StringToStringMap readHeaders_;
+  StringToStringMap writeHeaders_;
+
+  /**
+   * Returns the maximum number of bytes that write k/v headers can take
+   */
+  size_t getMaxWriteHeadersSize() const;
+
+  struct infoIdType {
+    enum idType {
+      // start at 1 to avoid confusing header padding for an infoId
+      KEYVALUE = 1,
+      END        // signal the end of infoIds we can handle
+    };
+  };
 
   THttpHeaderServer httpTransport_;
 

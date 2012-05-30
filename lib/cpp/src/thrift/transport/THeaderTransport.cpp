@@ -28,6 +28,7 @@
 #include <string>
 #include <zlib.h>
 
+using std::map;
 using std::string;
 using std::vector;
 
@@ -186,27 +187,82 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
   return true;
 }
 
+
+/**
+ * Reads a string from ptr, taking care not to reach headerBoundary
+ * Advances ptr on success
+ *
+ * @param   str                  output string
+ * @throws  INVALID_FRAME_SIZE  if size of string exceeds boundary
+ */
+void readString(uint8_t* &ptr, /* out */ string &str,
+                uint8_t const* headerBoundary) {
+  int32_t strLen;
+
+  uint32_t bytes = readVarint32(ptr, &strLen, headerBoundary);
+  if (ptr + strLen > headerBoundary) {
+    throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
+                              "Info header length exceeds header size");
+  }
+  ptr += bytes;
+  str.assign(reinterpret_cast<const char*>(ptr), strLen);
+  ptr += strLen;
+}
+
 void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
   readTrans_.clear(); // Clear out any previous transforms.
+  readHeaders_.clear(); // Clear out any previous headers.
+
   uint8_t* ptr = reinterpret_cast<uint8_t*>(rBuf_.get());
   headerSize *= 4;
-  uint8_t* headerBoundary = ptr + headerSize;
+  const uint8_t* const headerBoundary = ptr + headerSize;
   if (headerSize > sz) {
     throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
                               "Header size is larger than frame");
   }
   ptr += readVarint16(ptr, &protoId, headerBoundary);
-  int16_t headerCount;
-  ptr += readVarint16(ptr, &headerCount, headerBoundary);
+  int16_t numTransforms;
+  ptr += readVarint16(ptr, &numTransforms, headerBoundary);
 
   // For now all transforms consist of only the ID, not data.
-  for (int i = 0; i < headerCount; i++) {
+  for (int i = 0; i < numTransforms; i++) {
     int32_t transId;
     ptr += readVarint32(ptr, &transId, headerBoundary);
     readTrans_.push_back(transId);
   }
 
-  // Skip over the Info headers.  No info headers currently.
+  // Info headers
+  while (ptr < headerBoundary) {
+    uint32_t infoId;
+    ptr += readVarint32(ptr, (int32_t*)&infoId, headerBoundary);
+
+    if (infoId == 0) {
+      // header padding
+      break;
+    }
+    if (infoId >= infoIdType::END) {
+      // cannot handle infoId
+      break;
+    }
+    switch (infoId) {
+      case infoIdType::KEYVALUE:
+        // Process key-value headers
+        uint32_t numKVHeaders;
+        ptr += readVarint32(ptr, (int32_t*)&numKVHeaders, headerBoundary);
+        // continue until we reach (padded) end of packet
+        while (numKVHeaders-- && ptr < headerBoundary) {
+          // format: key; value
+          // both: length (varint32); value (string)
+          string key, value;
+          readString(ptr, key, headerBoundary);
+          // value
+          readString(ptr, value, headerBoundary);
+          // save to headers
+          readHeaders_[key] = value;
+        }
+        break;
+    }
+  }
 
   // Untransform the data section.  rBuf will contain result.
   untransform(rBuf_.get() + headerSize, sz - headerSize);
@@ -345,6 +401,37 @@ uint32_t THeaderTransport::getWriteBytes() {
   return wBase_ - wBuf_.get();
 }
 
+/**
+ * Writes a string to a byte buffer, as size (varint32) + string (non-null
+ * terminated)
+ * Automatically advances ptr to after the written portion
+ */
+void writeString(uint8_t* &ptr, const string& str) {
+  uint32_t strLen = str.length();
+  ptr += writeVarint32(strLen, ptr);
+  memcpy(ptr, str.c_str(), strLen); // no need to write \0
+  ptr += strLen;
+}
+
+void THeaderTransport::setHeader(const string& key, const string& value) {
+  writeHeaders_[key] = value;
+}
+
+size_t THeaderTransport::getMaxWriteHeadersSize() const {
+  size_t maxWriteHeadersSize = 0;
+  for (auto it = writeHeaders_.begin(); it != writeHeaders_.end(); ++it) {
+    // add sizes of key and value to maxWriteHeadersSize
+    // 2 varints32 + the strings themselves
+    maxWriteHeadersSize += 5 + 5 + (it->first).length() +
+      (it->second).length();
+  }
+  return maxWriteHeadersSize;
+}
+
+void THeaderTransport::clearHeaders() {
+  writeHeaders_.clear();
+}
+
 void THeaderTransport::flush()  {
   // Write out any data waiting in the write buffer.
   uint32_t haveBytes = getWriteBytes();
@@ -373,9 +460,15 @@ void THeaderTransport::flush()  {
     // header size will need to be updated at the end because of varints.
     // Make it big enough here for max varint size, plus 4 for padding.
     int headerSize = (2 + getNumTransforms()) * 5 + 4;
-    uint32_t maxSzHbo = headerSize + haveBytes + 4; // Pkt size
+    // add approximate size of info headers
+    headerSize += getMaxWriteHeadersSize();
+
+    // Pkt size
+    uint32_t maxSzHbo = headerSize + haveBytes // thrift header + payload
+                        + 10;                  // common header section
     uint8_t* pkt = tBuf_.get();
-    uint8_t* headerPtr;
+    uint8_t* headerStart;
+    uint8_t* headerSizePtr;
     uint8_t* pktStart = pkt;
 
     if (maxSzHbo > tBufSize_) {
@@ -388,7 +481,7 @@ void THeaderTransport::flush()  {
     uint16_t headerSizeN;
 
     // Fixup szHbo later
-    pkt += sizeof(szHbo);
+    pkt += sizeof(szNbo);
     uint16_t headerN = htons(HEADER_MAGIC >> 16);
     memcpy(pkt, &headerN, sizeof(headerN));
     pkt += sizeof(headerN);
@@ -398,9 +491,10 @@ void THeaderTransport::flush()  {
     uint32_t seqIdN = htonl(seqId);
     memcpy(pkt, &seqIdN, sizeof(seqIdN));
     pkt += sizeof(seqIdN);
-    headerPtr = pkt;
+    headerSizePtr = pkt;
     // Fixup headerSizeN later
     pkt += sizeof(headerSizeN);
+    headerStart = pkt;
 
     pkt += writeVarint32(protoId, pkt);
     pkt += writeVarint32(getNumTransforms(), pkt);
@@ -411,11 +505,28 @@ void THeaderTransport::flush()  {
       pkt += writeVarint32(*it, pkt);
     }
 
+    // write info headers
+
+    // for now only write kv-headers
+    uint16_t headerCount = writeHeaders_.size();
+    if (headerCount > 0) {
+      pkt += writeVarint32(infoIdType::KEYVALUE, pkt);
+      // Write key-value headers count
+      pkt += writeVarint32(headerCount, pkt);
+      // Write info headers
+      map<string, string>::const_iterator it;
+      for (it = writeHeaders_.begin(); it != writeHeaders_.end(); ++it) {
+        writeString(pkt, it->first);  // key
+        writeString(pkt, it->second); // value
+      }
+      writeHeaders_.clear();
+    }
+
     // TODO(davejwatson) optimize this for writing twice/memcopy to pkt buffer.
     // See code in TBufferTransports
 
     // Fixups after varint size calculations
-    headerSize = (pkt - pktStart) - 14;
+    headerSize = (pkt - headerStart);
     uint8_t padding = 4 - (headerSize % 4);
     headerSize += padding;
 
@@ -424,11 +535,13 @@ void THeaderTransport::flush()  {
       *(pkt++) = 0x00;
     }
 
-    szHbo = headerSize + haveBytes + 10; // Pkt size
+    // Pkt size
+    szHbo = headerSize + haveBytes           // thrift header + payload
+            + (headerStart - pktStart - 4);  // common header section
     szNbo = htonl(szHbo);
     memcpy(pktStart, &szNbo, sizeof(szNbo));
     headerSizeN = htons(headerSize / 4);
-    memcpy(headerPtr, &headerSizeN, sizeof(headerSizeN));
+    memcpy(headerSizePtr, &headerSizeN, sizeof(headerSizeN));
 
     outTransport_->write(pktStart, szHbo - haveBytes + 4);
     outTransport_->write(wBuf_.get(), haveBytes);
