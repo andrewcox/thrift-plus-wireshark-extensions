@@ -29,6 +29,7 @@
 #include <zlib.h>
 
 using std::map;
+using boost::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -50,7 +51,7 @@ void THeaderTransport::initSupportedClients(std::bitset<CLIENT_TYPES_LEN>
 
 uint32_t THeaderTransport::readAll(uint8_t* buf, uint32_t len) {
   if (clientType == THRIFT_HTTP_CLIENT_TYPE) {
-    return httpTransport_.read(buf, len);
+    return httpTransport_->read(buf, len);
   }
 
   // We want to call TBufferBase's version here, because
@@ -61,7 +62,7 @@ uint32_t THeaderTransport::readAll(uint8_t* buf, uint32_t len) {
 uint32_t THeaderTransport::readSlow(uint8_t* buf, uint32_t len) {
 
   if (clientType == THRIFT_HTTP_CLIENT_TYPE) {
-    return httpTransport_.read(buf, len);
+    return httpTransport_->read(buf, len);
   }
 
   if (clientType == THRIFT_UNFRAMED_DEPRECATED) {
@@ -129,6 +130,13 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
     }
   } else if (sz == HTTP_MAGIC) {
     clientType = THRIFT_HTTP_CLIENT_TYPE;
+
+    // Transports don't support readahead, so put back the szN we read
+    // off the wire for httpTransport_ to read.  It was probably 'POST'.
+    shared_ptr<TBufferedTransport> bufferedTrans(
+      new TBufferedTransport(transport_));
+    bufferedTrans->putBack(reinterpret_cast<uint8_t*>(&szN), sizeof(szN));
+    httpTransport_ = shared_ptr<TTransport>(new THttpServer(bufferedTrans));
   } else {
     // Could be header format or framed. Check next uint32
     uint32_t magic_n;
@@ -555,8 +563,8 @@ void THeaderTransport::flush()  {
   } else if (clientType == THRIFT_UNFRAMED_DEPRECATED) {
     outTransport_->write(wBuf_.get(), haveBytes);
   } else if (clientType == THRIFT_HTTP_CLIENT_TYPE) {
-    httpTransport_.write(wBuf_.get(), haveBytes);
-    httpTransport_.flush();
+    httpTransport_->write(wBuf_.get(), haveBytes);
+    httpTransport_->flush();
   } else {
     throw TTransportException(TTransportException::BAD_ARGS,
                               "Unknown client type");

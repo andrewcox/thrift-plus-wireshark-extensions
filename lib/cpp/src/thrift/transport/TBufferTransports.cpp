@@ -26,6 +26,31 @@ using std::string;
 
 namespace apache { namespace thrift { namespace transport {
 
+void TBufferedTransport::putBack(uint8_t* buf, uint32_t len) {
+  assert(len < rBufSize_);
+
+  // Check that len fits.
+  // We push rBase_ back below to rBuf_.get()
+  if (rBound_ + len > rBufSize_  + rBase_) {
+    throw TTransportException(TTransportException::BAD_ARGS,
+                              "TBufferedTransport called with oversize buf");
+  }
+
+  // Reset the buffer to initial position, moving any unread data.
+  if (rBuf_.get() + len > rBase_) {
+    if (rBase_ != rBound_) {
+      // advance further to get room for the putback bytes
+      memmove(rBuf_.get() + len, rBase_, rBound_ - rBase_);
+    }
+    rBound_ += (rBuf_.get() - rBase_);
+    rBase_ = rBuf_.get();
+  } else {
+    rBase_ -= len;
+    rBound_ -= len;
+  }
+  memcpy(rBase_, buf, len);
+  rBound_ += len;
+}
 
 uint32_t TBufferedTransport::readSlow(uint8_t* buf, uint32_t len) {
   uint32_t have = static_cast<uint32_t>(rBound_ - rBase_);

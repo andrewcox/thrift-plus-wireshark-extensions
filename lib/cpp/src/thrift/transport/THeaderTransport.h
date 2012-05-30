@@ -45,24 +45,6 @@ namespace apache { namespace thrift { namespace transport {
 
 using namespace apache::thrift::protocol;
 
-class THttpHeaderServer : public THttpServer {
- public:
-
-  THttpHeaderServer(boost::shared_ptr<TTransport> transport) :
-      THttpServer(transport)
-    {
-    }
-
-  void refill() {
-    // POST - because we read this earlier, need to put it back.
-    uint32_t postBytes = 0x54534F50;
-    memcpy(httpBuf_, &postBytes, sizeof(postBytes));
-    httpBufLen_ = sizeof(postBytes);
-    httpPos_ = 0;
-    THttpTransport::refill();
-  }
-};
-
 /**
  * Header transport. All writes go into an in-memory buffer until flush is
  * called, at which point the transport writes the length of the entire
@@ -293,7 +275,7 @@ class THeaderTransport
     };
   };
 
-  THttpHeaderServer httpTransport_;
+  boost::shared_ptr<TTransport> httpTransport_;
 
   // Buffers to use for transform processing
   uint32_t tBufSize_;

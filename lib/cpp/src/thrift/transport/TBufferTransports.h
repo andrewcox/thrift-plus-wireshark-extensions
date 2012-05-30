@@ -227,6 +227,9 @@ class TBufferedTransport
     initPointers();
   }
 
+  // Tries to put some data back in the beginning of the read buffer.
+  void putBack(uint8_t* buf, uint32_t len);
+
   void open() {
     transport_->open();
   }
