@@ -187,7 +187,7 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
 }
 
 void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
-  read_trans.clear(); // Clear out any previous transforms.
+  readTrans_.clear(); // Clear out any previous transforms.
   uint8_t* ptr = reinterpret_cast<uint8_t*>(rBuf_.get());
   headerSize *= 4;
   uint8_t* headerBoundary = ptr + headerSize;
@@ -203,7 +203,7 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
   for (int i = 0; i < headerCount; i++) {
     int32_t transId;
     ptr += readVarint32(ptr, &transId, headerBoundary);
-    read_trans.push_back(transId);
+    readTrans_.push_back(transId);
   }
 
   // Skip over the Info headers.  No info headers currently.
@@ -221,8 +221,8 @@ void THeaderTransport::untransform(uint8_t* ptr, uint32_t sz) {
   // Update the transform buffer size if needed
   resizeTransformBuffer();
 
-  for (vector<uint16_t>::const_iterator it = read_trans.begin();
-       it != read_trans.end(); ++it) {
+  for (vector<uint16_t>::const_iterator it = readTrans_.begin();
+       it != readTrans_.end(); ++it) {
     const uint16_t transId = *it;
 
     if (transId == ZLIB_TRANSFORM) {
@@ -289,8 +289,8 @@ void THeaderTransport::transform(uint8_t* ptr, uint32_t sz) {
   // Update the transform buffer size if needed
   resizeTransformBuffer();
 
-  for (vector<uint16_t>::const_iterator it = write_trans.begin();
-       it != write_trans.end(); ++it) {
+  for (vector<uint16_t>::const_iterator it = writeTrans_.begin();
+       it != writeTrans_.end(); ++it) {
     const uint16_t transId = *it;
 
     if (transId == ZLIB_TRANSFORM) {
@@ -406,8 +406,8 @@ void THeaderTransport::flush()  {
     pkt += writeVarint32(getNumTransforms(), pkt);
 
     // For now, each transform is only the ID, no following data.
-    for (vector<uint16_t>::const_iterator it = write_trans.begin();
-         it != write_trans.end(); ++it) {
+    for (vector<uint16_t>::const_iterator it = writeTrans_.begin();
+         it != writeTrans_.end(); ++it) {
       pkt += writeVarint32(*it, pkt);
     }
 

@@ -209,9 +209,9 @@ class THeaderTransport
    */
   void transform(uint8_t* ptr, uint32_t sz);
 
-  uint16_t getNumTransforms() const { return write_trans.size(); }
+  uint16_t getNumTransforms() const { return writeTrans_.size(); }
 
-  void setTransform(uint16_t transId) { write_trans.push_back(transId); }
+  void setTransform(uint16_t transId) { writeTrans_.push_back(transId); }
 
   enum TRANSFORMS {
     ZLIB_TRANSFORM = 0x01,
@@ -255,8 +255,8 @@ class THeaderTransport
   uint32_t seqId;
   uint16_t flags;
 
-  std::vector<uint16_t> read_trans;
-  std::vector<uint16_t> write_trans;
+  std::vector<uint16_t> readTrans_;
+  std::vector<uint16_t> writeTrans_;
 
   THttpHeaderServer httpTransport_;
 
