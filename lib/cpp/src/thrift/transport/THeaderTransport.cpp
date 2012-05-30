@@ -150,44 +150,45 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
     uint32_t magic_n;
     uint32_t magic;
 
+    if (sz > MAX_FRAME_SIZE) {
+      throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
+                                "Header transport frame is too large");
+    }
+
     allocateReadBuffer(sz);
 
     // We can use readAll here, because it would be an invalid frame otherwise
     transport_->readAll(reinterpret_cast<uint8_t*>(&magic_n), sizeof(magic_n));
-
+    memcpy(rBuf_.get(), &magic_n, sizeof(magic_n));
     magic = ntohl(magic_n);
+
     if ((magic & TBinaryProtocol::VERSION_MASK) == TBinaryProtocol::VERSION_1) {
       // framed
       clientType = THRIFT_FRAMED_DEPRECATED;
-      if (sz > MAX_FRAME_SIZE) {
-        throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
-                                  "Header transport frame was too large");
-      }
-      memcpy(rBuf_.get(), &magic_n, sizeof(magic_n));
       transport_->readAll(rBuf_.get() + 4, sz - 4);
       setReadBuffer(rBuf_.get(), sz);
     } else if (HEADER_MAGIC == (magic & HEADER_MASK)) {
+      if (sz < 10) {
+        throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
+                                  "Header transport frame is too small");
+      }
+
+      transport_->readAll(rBuf_.get() + 4, sz - 4);
+
       // header format
       clientType = THRIFT_HEADER_CLIENT_TYPE;
       // flags
       flags = magic & FLAGS_MASK;
       // seqId
       uint32_t seqId_n;
-      transport_->readAll(reinterpret_cast<uint8_t*>(&seqId_n),
-          sizeof(seqId_n));
+      memcpy(&seqId_n, rBuf_.get() + 4, sizeof(seqId_n));
       seqId = ntohl(seqId_n);
       // header size
       uint16_t headerSize_n;
-      transport_->readAll(reinterpret_cast<uint8_t*>(&headerSize_n),
-          sizeof(headerSize_n));
+      memcpy(&headerSize_n, rBuf_.get() + 8, sizeof(headerSize_n));
       uint16_t headerSize = ntohs(headerSize_n);
-      if (sz > MAX_FRAME_SIZE) {
-        throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
-                                  "Header transport frame was too large");
-      }
-      transport_->readAll(rBuf_.get(), sz - 10);
-      setReadBuffer(rBuf_.get(), sz - 10);
-      readHeaderFormat(headerSize, sz - 10);
+      setReadBuffer(rBuf_.get(), sz);
+      readHeaderFormat(headerSize, sz);
     } else {
       clientType = THRIFT_UNKNOWN_CLIENT_TYPE;
       throw TTransportException(TTransportException::BAD_ARGS,
@@ -229,22 +230,33 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
   readTrans_.clear(); // Clear out any previous transforms.
   readHeaders_.clear(); // Clear out any previous headers.
 
-  uint8_t* ptr = reinterpret_cast<uint8_t*>(rBuf_.get());
+  // skip over already processed magic(4), seqId(4), headerSize(2)
+  uint8_t* ptr = reinterpret_cast<uint8_t*>(rBuf_.get() + 10);
   headerSize *= 4;
   const uint8_t* const headerBoundary = ptr + headerSize;
   if (headerSize > sz) {
     throw TTransportException(TTransportException::INVALID_FRAME_SIZE,
                               "Header size is larger than frame");
   }
+  uint8_t* data = ptr + headerSize;
   ptr += readVarint16(ptr, &protoId, headerBoundary);
   int16_t numTransforms;
   ptr += readVarint16(ptr, &numTransforms, headerBoundary);
+
+  uint16_t macSz = 0;
 
   // For now all transforms consist of only the ID, not data.
   for (int i = 0; i < numTransforms; i++) {
     int32_t transId;
     ptr += readVarint32(ptr, &transId, headerBoundary);
-    readTrans_.push_back(transId);
+
+    if (transId == HMAC_TRANSFORM) {
+      macSz = *ptr;
+      *ptr = 0x00; // Blank to check mac.
+      ++ptr;
+    } else {
+      readTrans_.push_back(transId);
+    }
   }
 
   // Info headers
@@ -280,8 +292,24 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
     }
   }
 
+  if (verifyCallback_) {
+    string verify_data(reinterpret_cast<char*>(rBuf_.get()), sz - macSz);
+
+    string mac(reinterpret_cast<char*>(rBuf_.get() + sz - macSz), macSz);
+    ptr += macSz;
+    if (!verifyCallback_(verify_data, mac)) {
+      if (macSz > 0) {
+        throw TTransportException(TTransportException::INVALID_STATE,
+                                  "mac did not verify");
+      } else {
+        throw TTransportException(TTransportException::INVALID_STATE,
+                                  "Client did not send a mac");
+      }
+    }
+  }
+
   // Untransform the data section.  rBuf will contain result.
-  untransform(rBuf_.get() + headerSize, sz - headerSize);
+  untransform(data, sz - (data - rBuf_.get())); // ignore header in size calc
 
   if (protoId == T_JSON_PROTOCOL && clientType != THRIFT_HTTP_CLIENT_TYPE) {
     throw TApplicationException(TApplicationException::UNSUPPORTED_CLIENT_TYPE,
@@ -535,6 +563,14 @@ void THeaderTransport::flush()  {
       pkt += writeVarint32(*it, pkt);
     }
 
+    uint8_t* mac_loc = NULL;
+    if (macCallback_) {
+      pkt += writeVarint32(HMAC_TRANSFORM, pkt);
+      mac_loc = pkt;
+      *pkt = 0x00;
+      pkt++;
+    }
+
     // write info headers
 
     // Add in special flags
@@ -574,13 +610,32 @@ void THeaderTransport::flush()  {
     // Pkt size
     szHbo = headerSize + haveBytes           // thrift header + payload
             + (headerStart - pktStart - 4);  // common header section
-    szNbo = htonl(szHbo);
-    memcpy(pktStart, &szNbo, sizeof(szNbo));
     headerSizeN = htons(headerSize / 4);
     memcpy(headerSizePtr, &headerSizeN, sizeof(headerSizeN));
 
-    outTransport_->write(pktStart, szHbo - haveBytes + 4);
+    // hmac calculation should always be last.
+    string hmac;
+    if (macCallback_) {
+      // TODO(davejwatson): refactor macCallback_ interface to take
+      // several uint8_t buffers instead of string to avoid the extra copying.
+
+      // Ignoring 4 bytes of framing.
+      string headerData(reinterpret_cast<char*>(pktStart + 4),
+                        szHbo - haveBytes);
+      string data(reinterpret_cast<char*>(wBuf_.get()), haveBytes);
+      hmac = macCallback_(headerData + data);
+      *mac_loc = hmac.length(); // Set mac size.
+      szHbo += hmac.length();
+    }
+
+    // Set framing size.
+    szNbo = htonl(szHbo);
+    memcpy(pktStart, &szNbo, sizeof(szNbo));
+
+    outTransport_->write(pktStart, szHbo - haveBytes + 4 - hmac.length());
     outTransport_->write(wBuf_.get(), haveBytes);
+    outTransport_->write(reinterpret_cast<const uint8_t*>(hmac.c_str()),
+                         hmac.length());
   } else if (clientType == THRIFT_FRAMED_DEPRECATED) {
     uint32_t szHbo = (uint32_t)haveBytes;
     uint32_t szNbo = htonl(szHbo);

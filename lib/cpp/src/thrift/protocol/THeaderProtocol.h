@@ -79,6 +79,11 @@ class THeaderProtocol
 
   /*ol*/ uint32_t writeMessageEnd();
 
+  void setHmac(THeaderTransport::MacCallback macCb,
+               THeaderTransport::VerifyMacCallback verifyCb) {
+    trans_->setHmac(macCb, verifyCb);
+  }
+
   /**
    * Functions to work with headers by calling into THeaderTransport
    */
@@ -229,14 +234,14 @@ class THeaderProtocolFactory : public TProtocolFactory {
     }
   }
 
-  boost::shared_ptr<TProtocol> getProtocol(
+  virtual boost::shared_ptr<TProtocol> getProtocol(
       boost::shared_ptr<transport::TTransport> trans) {
     TProtocol* prot = new THeaderProtocol(trans, &clientTypes);
 
     return boost::shared_ptr<TProtocol>(prot);
   }
 
-  boost::shared_ptr<TProtocol> getProtocol(
+  virtual boost::shared_ptr<TProtocol> getProtocol(
       boost::shared_ptr<transport::TTransport> inTrans,
       boost::shared_ptr<transport::TTransport> outTrans) {
     TProtocol* prot = new THeaderProtocol(inTrans, outTrans, &clientTypes);

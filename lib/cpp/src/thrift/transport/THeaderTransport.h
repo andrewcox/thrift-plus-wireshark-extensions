@@ -20,6 +20,8 @@
 #ifndef THRIFT_TRANSPORT_THEADERTRANSPORT_H_
 #define THRIFT_TRANSPORT_THEADERTRANSPORT_H_ 1
 
+#include <tr1/functional>
+
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/protocol/TProtocolTypes.h>
 #include "TBufferTransports.h"
@@ -192,7 +194,13 @@ class THeaderTransport
    */
   void transform(uint8_t* ptr, uint32_t sz);
 
-  uint16_t getNumTransforms() const { return writeTrans_.size(); }
+  uint16_t getNumTransforms() const {
+    int trans = writeTrans_.size();
+    if (macCallback_) {
+      trans += 1;
+    }
+    return trans;
+  }
 
   void setTransform(uint16_t transId) { writeTrans_.push_back(transId); }
 
@@ -219,7 +227,32 @@ class THeaderTransport
 
   enum TRANSFORMS {
     ZLIB_TRANSFORM = 0x01,
+    HMAC_TRANSFORM = 0x02,
   };
+
+  /**
+   * Callbacks to get and verify a mac transform.
+   *
+   * If a mac callback is provided, it will be called with the outgoing packet,
+   * with the returned string appended at the end of the data.
+   *
+   * If a verify callback is provided, all incoming packets will be called with
+   * their mac data and packet data to verify.  If false is returned, an
+   * exception is thrown. Packets without any mac also throw an exception if a
+   * verify function is provided.
+   *
+   * If no verify callback is provided, and an incoming packet contains a mac,
+   * the mac is ignored.
+   *
+   **/
+  typedef std::tr1::function<std::string(const std::string&)> MacCallback;
+  typedef std::tr1::function<
+    bool(const std::string&, const std::string)> VerifyMacCallback;
+
+  void setHmac(MacCallback macCb, VerifyMacCallback verifyCb) {
+    macCallback_ = macCb;
+    verifyCallback_ = verifyCb;
+  }
 
  protected:
 
@@ -271,6 +304,9 @@ class THeaderTransport
   static const std::string ID_VERSION;
 
   static std::string identity;
+
+  MacCallback macCallback_;
+  VerifyMacCallback verifyCallback_;
 
   /**
    * Returns the maximum number of bytes that write k/v headers can take
