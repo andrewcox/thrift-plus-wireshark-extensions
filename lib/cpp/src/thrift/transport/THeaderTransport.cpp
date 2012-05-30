@@ -419,7 +419,8 @@ void THeaderTransport::setHeader(const string& key, const string& value) {
 
 size_t THeaderTransport::getMaxWriteHeadersSize() const {
   size_t maxWriteHeadersSize = 0;
-  for (auto it = writeHeaders_.begin(); it != writeHeaders_.end(); ++it) {
+  THeaderTransport::StringToStringMap::const_iterator it;
+  for (it = writeHeaders_.begin(); it != writeHeaders_.end(); ++it) {
     // add sizes of key and value to maxWriteHeadersSize
     // 2 varints32 + the strings themselves
     maxWriteHeadersSize += 5 + 5 + (it->first).length() +
