@@ -39,9 +39,13 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::util;
 using apache::thrift::protocol::TBinaryProtocol;
 
+// Gets username using getpwuid_r()
+string getIdentity();
+
 const string THeaderTransport::IDENTITY_HEADER = "identity";
 const string THeaderTransport::ID_VERSION_HEADER = "id_version";
 const string THeaderTransport::ID_VERSION = "1";
+string THeaderTransport::identity = getIdentity();
 
 void THeaderTransport::initSupportedClients(std::bitset<CLIENT_TYPES_LEN>
                                             const* clients) {
@@ -595,6 +599,18 @@ void THeaderTransport::flush()  {
 
   // Flush the underlying transport.
   outTransport_->flush();
+}
+
+string getIdentity() {
+  struct passwd pwd;
+  struct passwd *pwdbufp = NULL;
+  long buflen = sysconf(_SC_GETPW_R_SIZE_MAX);
+  boost::scoped_array<char> buf(new char[buflen]);
+  int retval = getpwuid_r(getuid(), &pwd, buf.get(), buflen, &pwdbufp);
+  if (pwdbufp) {
+    return pwdbufp->pw_name;
+  }
+  return "";
 }
 
 }}} // apache::thrift::transport
