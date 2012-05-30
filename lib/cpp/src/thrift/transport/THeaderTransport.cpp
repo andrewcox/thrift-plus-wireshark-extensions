@@ -308,6 +308,9 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
     }
   }
 
+  // Don't include the mac in the data to untransform
+  sz -= macSz;
+
   // Untransform the data section.  rBuf will contain result.
   untransform(data, sz - (data - rBuf_.get())); // ignore header in size calc
 
