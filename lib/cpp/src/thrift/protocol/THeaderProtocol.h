@@ -103,6 +103,12 @@ class THeaderProtocol
     return trans_->getHeaders();
   }
 
+  std::string getPeerIdentity() const {
+    return trans_->getPeerIdentity();
+  }
+  void setIdentity(const std::string& identity) {
+    trans_->setIdentity(identity);
+  }
 
   uint32_t writeStructBegin(const char* name);
 

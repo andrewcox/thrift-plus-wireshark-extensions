@@ -29,6 +29,7 @@
 
 #include <bitset>
 #include "boost/scoped_array.hpp"
+#include <unistd.h>
 
 // Don't include the unknown client.
 #define CLIENT_TYPES_LEN 4
@@ -68,6 +69,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(getlogin())
     , httpTransport_(transport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -84,6 +86,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(getlogin())
     , httpTransport_(transport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -101,6 +104,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(getlogin())
     , httpTransport_(outTransport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -117,6 +121,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(getlogin())
     , httpTransport_(transport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -213,6 +218,9 @@ class THeaderTransport
     return readHeaders_;
   }
 
+  std::string getPeerIdentity();
+  void setIdentity(const std::string& identity);
+
   enum TRANSFORMS {
     ZLIB_TRANSFORM = 0x01,
   };
@@ -261,6 +269,12 @@ class THeaderTransport
   // Map to use for headers
   StringToStringMap readHeaders_;
   StringToStringMap writeHeaders_;
+
+  static const std::string IDENTITY_HEADER;
+  static const std::string ID_VERSION_HEADER;
+  static const std::string ID_VERSION;
+
+  std::string identity;
 
   /**
    * Returns the maximum number of bytes that write k/v headers can take

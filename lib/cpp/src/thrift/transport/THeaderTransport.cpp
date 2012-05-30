@@ -39,6 +39,10 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::util;
 using apache::thrift::protocol::TBinaryProtocol;
 
+const string THeaderTransport::IDENTITY_HEADER = "identity";
+const string THeaderTransport::ID_VERSION_HEADER = "id_version";
+const string THeaderTransport::ID_VERSION = "1";
+
 void THeaderTransport::initSupportedClients(std::bitset<CLIENT_TYPES_LEN>
                                             const* clients) {
   if (clients) {
@@ -441,6 +445,19 @@ void THeaderTransport::clearHeaders() {
   writeHeaders_.clear();
 }
 
+string THeaderTransport::getPeerIdentity() {
+  if (readHeaders_.find(IDENTITY_HEADER) != readHeaders_.end()) {
+    if (readHeaders_[ID_VERSION_HEADER] == ID_VERSION) {
+      return readHeaders_[IDENTITY_HEADER];
+    }
+  }
+  return "";
+}
+
+void THeaderTransport::setIdentity(const string& identity) {
+  this->identity = identity;
+}
+
 void THeaderTransport::flush()  {
   // Write out any data waiting in the write buffer.
   uint32_t haveBytes = getWriteBytes();
@@ -515,6 +532,12 @@ void THeaderTransport::flush()  {
     }
 
     // write info headers
+
+    // Add in special flags
+    if (identity.length() > 0) {
+      writeHeaders_[IDENTITY_HEADER] = identity;
+      writeHeaders_[ID_VERSION_HEADER] = ID_VERSION;
+    }
 
     // for now only write kv-headers
     uint16_t headerCount = writeHeaders_.size();
