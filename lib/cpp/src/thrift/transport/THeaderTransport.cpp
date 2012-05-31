@@ -45,7 +45,7 @@ string getIdentity();
 const string THeaderTransport::IDENTITY_HEADER = "identity";
 const string THeaderTransport::ID_VERSION_HEADER = "id_version";
 const string THeaderTransport::ID_VERSION = "1";
-string THeaderTransport::identity = getIdentity();
+string THeaderTransport::s_identity = getIdentity();
 
 void THeaderTransport::initSupportedClients(std::bitset<CLIENT_TYPES_LEN>
                                             const* clients) {

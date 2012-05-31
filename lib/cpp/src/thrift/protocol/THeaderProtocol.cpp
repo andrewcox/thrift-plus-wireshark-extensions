@@ -31,13 +31,13 @@
 namespace apache { namespace thrift { namespace protocol {
 
 void THeaderProtocol::resetProtocol() {
-  if (proto_ && protoId == trans_->getProtocolId()) {
+  if (proto_ && protoId_ == trans_->getProtocolId()) {
     return;
   }
 
-  protoId = trans_->getProtocolId();
+  protoId_ = trans_->getProtocolId();
 
-  switch (protoId) {
+  switch (protoId_) {
     case T_BINARY_PROTOCOL:
       proto_ = boost::shared_ptr<TProtocol>(
         new TBinaryProtocolT<THeaderTransport>(trans_));

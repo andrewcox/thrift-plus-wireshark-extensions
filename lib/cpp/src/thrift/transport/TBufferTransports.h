@@ -195,7 +195,7 @@ class TBufferedTransport
   static const int DEFAULT_BUFFER_SIZE = 512;
 
   /// Use default buffer sizes.
-  TBufferedTransport(boost::shared_ptr<TTransport> transport)
+  explicit TBufferedTransport(boost::shared_ptr<TTransport> transport)
     : transport_(transport)
     , rBufSize_(DEFAULT_BUFFER_SIZE)
     , wBufSize_(DEFAULT_BUFFER_SIZE)
@@ -334,7 +334,7 @@ class TFramedTransport
 
 
   /// Use default buffer sizes.
-  TFramedTransport(boost::shared_ptr<TTransport> transport)
+  explicit TFramedTransport(boost::shared_ptr<TTransport> transport)
     : transport_(transport)
     , rBufSize_(0)
     , wBufSize_(DEFAULT_BUFFER_SIZE)
@@ -534,7 +534,7 @@ class TMemoryBuffer : public TVirtualTransport<TMemoryBuffer, TBufferBase> {
    *
    * @param sz  The initial size of the buffer.
    */
-  TMemoryBuffer(uint32_t sz) {
+  explicit TMemoryBuffer(uint32_t sz) {
     initCommon(NULL, sz, true, 0);
   }
 
@@ -586,6 +586,8 @@ class TMemoryBuffer : public TVirtualTransport<TMemoryBuffer, TBufferBase> {
   void open() {}
 
   void close() {}
+
+  uint32_t getBufferSize() const { return bufferSize_; }
 
   // TODO(dreiss): Make bufPtr const.
   void getBuffer(uint8_t** bufPtr, uint32_t* sz) {

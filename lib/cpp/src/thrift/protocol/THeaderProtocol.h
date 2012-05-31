@@ -46,12 +46,14 @@ class THeaderProtocol
   void resetProtocol();
 
   explicit THeaderProtocol(const boost::shared_ptr<TTransport>& trans,
-                           std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
+                           std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL,
+                           uint16_t protoId = T_COMPACT_PROTOCOL) :
       TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(trans,
                                                                              clientTypes))
-    , trans_((THeaderTransport*)this->getTransport().get())
-    , protoId(T_BINARY_PROTOCOL)
+      , trans_((THeaderTransport*)this->getTransport().get())
+      , protoId_(protoId)
     {
+      trans_->setProtocolId(protoId);
       resetProtocol();
     }
 
@@ -60,13 +62,15 @@ class THeaderProtocol
 
   THeaderProtocol(const boost::shared_ptr<TTransport>& inTrans,
                   const boost::shared_ptr<TTransport>& outTrans,
-                  std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
+                  std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL,
+                  uint16_t protoId = T_COMPACT_PROTOCOL) :
       TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(inTrans,
 									     outTrans,
 									     clientTypes))
-    , trans_((THeaderTransport*)this->getTransport().get())
-    , protoId(T_BINARY_PROTOCOL)
+      , trans_((THeaderTransport*)this->getTransport().get())
+      , protoId_(protoId)
     {
+      trans_->setProtocolId(protoId);
       resetProtocol();
     }
 
@@ -88,6 +92,10 @@ class THeaderProtocol
   /**
    * Functions to work with headers by calling into THeaderTransport
    */
+  void setProtocolId(uint16_t protoId) {
+    trans_->setProtocolId(protoId);
+    resetProtocol();
+  }
 
   typedef THeaderTransport::StringToStringMap StringToStringMap;
 
@@ -217,15 +225,11 @@ class THeaderProtocol
   boost::shared_ptr<THeaderTransport> trans_;
 
   boost::shared_ptr<TProtocol> proto_;
-  uint32_t protoId;
+  uint32_t protoId_;
 };
 
 /**
  * Constructs header protocol handlers
- *
- * TODO(afrind): Cob clients in their current instantiation cannot use
- * THeaderProtocol because the only ctor takes a straight-up TProtocolFactory
- * rather than duplex.  Add new ctors?  Or create an adapter?
  */
 class THeaderProtocolFactory : public TDuplexProtocolFactory {
  public:
@@ -260,6 +264,35 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
 
  private:
   std::bitset<CLIENT_TYPES_LEN> clientTypes;
+};
+
+
+/**
+ * Protocol factory for header clients (notably Cob clients).
+ * The input and ouput protocol objects will be different in this case, but
+ * no functionality depends on them being the same at present.
+ */
+class THeaderClientProtocolFactory : public TProtocolFactory {
+ private:
+  uint16_t protoId_;
+  bool disableIdentity_;
+
+ public:
+  explicit THeaderClientProtocolFactory(uint16_t protoId = T_COMPACT_PROTOCOL,
+                                        bool disableIdentity = false) {
+    protoId_ = protoId;
+    disableIdentity_ = disableIdentity;
+  }
+
+  virtual boost::shared_ptr<TProtocol> getProtocol(
+      boost::shared_ptr<transport::TTransport> trans) {
+    THeaderProtocol *headerProtocol = new THeaderProtocol(trans, NULL,
+                                                          protoId_);
+    if (disableIdentity_) {
+      headerProtocol->setIdentity("");
+    }
+    return boost::shared_ptr<TProtocol>(headerProtocol);
+  }
 };
 
 }}} // apache::thrift::protocol

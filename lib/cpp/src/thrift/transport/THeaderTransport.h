@@ -71,6 +71,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(s_identity)
     , httpTransport_(transport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -87,6 +88,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(s_identity)
     , httpTransport_(transport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -120,6 +122,7 @@ class THeaderTransport
     , clientType(THRIFT_HEADER_CLIENT_TYPE)
     , seqId(0)
     , flags(0)
+    , identity(s_identity)
     , httpTransport_(transport)
     , tBufSize_(0)
     , tBuf_(NULL)
@@ -295,6 +298,7 @@ class THeaderTransport
   uint16_t clientType;
   uint32_t seqId;
   uint16_t flags;
+  std::string identity;
 
   std::vector<uint16_t> readTrans_;
   std::vector<uint16_t> writeTrans_;
@@ -307,7 +311,7 @@ class THeaderTransport
   static const std::string ID_VERSION_HEADER;
   static const std::string ID_VERSION;
 
-  static std::string identity;
+  static std::string s_identity;
 
   MacCallback macCallback_;
   VerifyMacCallback verifyCallback_;
