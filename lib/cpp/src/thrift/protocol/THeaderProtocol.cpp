@@ -19,9 +19,9 @@
 #ifndef _THRIFT_PROTOCOL_THEADERPROTOCOL_CPP_
 #define _THRIFT_PROTOCOL_THEADERPROTOCOL_CPP_ 1
 
+#include "THeaderProtocol.h"
 #include "TCompactProtocol.h"
 #include "TJSONProtocol.h"
-#include "THeaderProtocol.h"
 #include <thrift/TApplicationException.h>
 
 #include <limits>
@@ -62,6 +62,7 @@ uint32_t THeaderProtocol::writeMessageBegin(const std::string& name,
                                             const TMessageType messageType,
                                             const int32_t seqId) {
   resetProtocol(); // Reset in case we changed protocols
+  trans_->setSequenceNumber(seqId);
   return proto_->writeMessageBegin(name, messageType, seqId);
 }
 
@@ -255,4 +256,4 @@ uint32_t THeaderProtocol::readBinary(std::string& binary) {
 
 }}} // apache::thrift::protocol
 
-#endif // #ifndef _THRIFT_PROTOCOL_THEADERPROTOCOL_CPP_
+#endif // #ifndef THRIFT_PROTOCOL_THEADERPROTOCOL_CPP_

@@ -46,7 +46,7 @@ enum CLIENT_TYPE {
 
 namespace apache { namespace thrift { namespace transport {
 
-using namespace apache::thrift::protocol;
+using apache::thrift::protocol::T_COMPACT_PROTOCOL;
 
 /**
  * Header transport. All writes go into an in-memory buffer until flush is
@@ -64,7 +64,7 @@ class THeaderTransport
   static const int DEFAULT_BUFFER_SIZE = 512u;
 
   /// Use default buffer sizes.
-  THeaderTransport(const boost::shared_ptr<TTransport> transport)
+  explicit THeaderTransport(const boost::shared_ptr<TTransport> transport)
     : transport_(transport)
     , outTransport_(transport)
     , protoId(T_COMPACT_PROTOCOL)
@@ -224,6 +224,10 @@ class THeaderTransport
 
   std::string getPeerIdentity();
   void setIdentity(const std::string& identity);
+
+  // accessors for seqId
+  int32_t getSequenceNumber() const { return seqId; }
+  void setSequenceNumber(int32_t seqId) { this->seqId = seqId; }
 
   enum TRANSFORMS {
     ZLIB_TRANSFORM = 0x01,
