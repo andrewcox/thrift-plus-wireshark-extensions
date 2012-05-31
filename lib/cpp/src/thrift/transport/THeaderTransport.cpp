@@ -497,6 +497,11 @@ void THeaderTransport::flush()  {
   // Write out any data waiting in the write buffer.
   uint32_t haveBytes = getWriteBytes();
 
+  // Nothing to flush
+  if (haveBytes == 0) {
+    return;
+  }
+
   if (clientType == THRIFT_HEADER_CLIENT_TYPE) {
     transform(wBuf_.get(), haveBytes);
     haveBytes = getWriteBytes(); // transform may have changed the size

@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/THeaderProtocol.h>
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/transport/THttpClient.h>
 #include <thrift/transport/TTransportUtils.h>
@@ -69,7 +70,7 @@ static void testString_clientReturn(const char* host, int port, event_base *base
     client->recv_testString(s);
     cout << "testString: " << s << endl;
   } catch (TException& exn) {
-    cout << "Error: " << exn.what() << endl;    
+    cout << "Error: " << exn.what() << endl;
   }
 
   event_base_loopbreak(base); // end test
@@ -86,7 +87,7 @@ static void testVoid_clientReturn(const char* host, int port, event_base *base, 
     client = new ThriftTestCobClient(channel, protocolFactory);
     client->testString(tr1::bind(testString_clientReturn, host, port, base, protocolFactory, std::tr1::placeholders::_1), "Test");
   } catch (TException& exn) {
-    cout << "Error: " << exn.what() << endl;    
+    cout << "Error: " << exn.what() << endl;
   }
 }
 
@@ -104,26 +105,27 @@ int main(int argc, char** argv) {
       ("help,h", "produce help message")
       ("host", program_options::value<string>(&host)->default_value(host), "Host to connect")
       ("port", program_options::value<int>(&port)->default_value(port), "Port number to connect")
-	  ("domain-socket", program_options::value<string>(&domain_socket)->default_value(domain_socket), "Domain Socket (e.g. /tmp/ThriftTest.thrift), instead of host and port")
+      ("domain-socket", program_options::value<string>(&domain_socket)->default_value(domain_socket), "Domain Socket (e.g. /tmp/ThriftTest.thrift), instead of host and port")
       ("transport", program_options::value<string>(&transport_type)->default_value(transport_type), "Transport: buffered, framed, http, evhttp")
-      ("protocol", program_options::value<string>(&protocol_type)->default_value(protocol_type), "Protocol: binary, json")
-	  ("ssl", "Encrypted Transport using SSL")
+      ("protocol", program_options::value<string>(&protocol_type)->default_value(protocol_type), "Protocol: binary, json, header")
+      ("ssl", "Encrypted Transport using SSL")
       ("testloops,n", program_options::value<int>(&numTests)->default_value(numTests), "Number of Tests")
   ;
 
   program_options::variables_map vm;
   program_options::store(program_options::parse_command_line(argc, argv, desc), vm);
-  program_options::notify(vm);    
+  program_options::notify(vm);
 
   if (vm.count("help")) {
     cout << desc << "\n";
     return 1;
   }
 
-  try {   
+  try {
     if (!protocol_type.empty()) {
       if (protocol_type == "binary") {
       } else if (protocol_type == "json") {
+      } else if (protocol_type == "header") {
       } else {
           throw invalid_argument("Unknown protocol type "+protocol_type);
       }
@@ -183,9 +185,13 @@ int main(int argc, char** argv) {
   }
 
   if (protocol_type.compare("json") == 0) {
-    boost::shared_ptr<TProtocol> jsonProtocol(new TJSONProtocol(transport));
+    boost::shared_ptr<TJSONProtocol> jsonProtocol(new TJSONProtocol(transport));
     protocol = jsonProtocol;
-  } else{
+  } else if (protocol_type.compare("header") == 0) {
+    boost::shared_ptr<THeaderProtocol> headerProtocol(new THeaderProtocol(transport));
+    headerProtocol->setProtocolId(T_BINARY_PROTOCOL);
+    protocol = headerProtocol;
+  } else {
     boost::shared_ptr<TBinaryProtocol> binaryProtocol(new TBinaryProtocol(transport));
     protocol = binaryProtocol;
   }
@@ -210,7 +216,7 @@ int main(int argc, char** argv) {
     boost::shared_ptr<TAsyncChannel> channel(new TEvhttpClientChannel(host.c_str(), "/", host.c_str(), port, base));
     ThriftTestCobClient* client = new ThriftTestCobClient(channel, protocolFactory.get());
     client->testVoid(tr1::bind(testVoid_clientReturn, host.c_str(), port, base, protocolFactory.get(), std::tr1::placeholders::_1));
-    
+
     event_base_loop(base, 0);
     return 0;
   }

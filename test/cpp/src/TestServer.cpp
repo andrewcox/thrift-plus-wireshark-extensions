@@ -23,6 +23,7 @@
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/concurrency/PlatformThreadFactory.h>
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/THeaderProtocol.h>
 #include <thrift/protocol/TJSONProtocol.h>
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/server/TThreadedServer.h>
@@ -266,7 +267,7 @@ class TestHandler : public ThriftTestIf {
     (void) arg3;
     (void) arg4;
     (void) arg5;
-    
+
     printf("testMulti()\n");
 
     hello.string_thing = "Hello2";
@@ -447,7 +448,7 @@ public:
   }
 
   virtual void testInsanity(std::tr1::function<void(std::map<UserId, std::map<Numberz::type, Insanity> >  const& _return)> cob, const Insanity& argument) {
-    std::map<UserId, std::map<Numberz::type, Insanity> > res; 
+    std::map<UserId, std::map<Numberz::type, Insanity> > res;
     _delegate->testInsanity(res, argument);
     cob(res);
  }
@@ -498,34 +499,34 @@ int main(int argc, char **argv) {
   string domain_socket = "";
   size_t workers = 4;
 
- 
+
   program_options::options_description desc("Allowed options");
   desc.add_options()
       ("help,h", "produce help message")
       ("port", program_options::value<int>(&port)->default_value(port), "Port number to listen")
-	  ("domain-socket", program_options::value<string>(&domain_socket)->default_value(domain_socket),
-	    "Unix Domain Socket (e.g. /tmp/ThriftTest.thrift)")
+      ("domain-socket", program_options::value<string>(&domain_socket)->default_value(domain_socket),
+        "Unix Domain Socket (e.g. /tmp/ThriftTest.thrift)")
       ("server-type", program_options::value<string>(&server_type)->default_value(server_type),
         "type of server, \"simple\", \"thread-pool\", \"threaded\", or \"nonblocking\"")
       ("transport", program_options::value<string>(&transport_type)->default_value(transport_type),
         "transport: buffered, framed, http")
       ("protocol", program_options::value<string>(&protocol_type)->default_value(protocol_type),
-        "protocol: binary, json")
-	  ("ssl", "Encrypted Transport using SSL")
-	  ("processor-events", "processor-events")
+        "protocol: binary, json, header")
+      ("ssl", "Encrypted Transport using SSL")
+      ("processor-events", "processor-events")
       ("workers,n", program_options::value<size_t>(&workers)->default_value(workers),
         "Number of thread pools workers. Only valid for thread-pool server type")
   ;
 
   program_options::variables_map vm;
   program_options::store(program_options::parse_command_line(argc, argv, desc), vm);
-  program_options::notify(vm);    
+  program_options::notify(vm);
 
   if (vm.count("help")) {
       cout << desc << "\n";
       return 1;
   }
-  
+
   try {
     if (!server_type.empty()) {
       if (server_type == "simple") {
@@ -536,10 +537,11 @@ int main(int argc, char **argv) {
           throw invalid_argument("Unknown server type "+server_type);
       }
     }
-    
+
     if (!protocol_type.empty()) {
       if (protocol_type == "binary") {
       } else if (protocol_type == "json") {
+      } else if (protocol_type == "header") {
       } else {
           throw invalid_argument("Unknown protocol type "+protocol_type);
       }
@@ -566,24 +568,33 @@ int main(int argc, char **argv) {
   }
 
   // Dispatcher
-  boost::shared_ptr<TProtocolFactory> protocolFactory;
+  boost::shared_ptr<TDuplexProtocolFactory> duplexProtocolFactory;
   if (protocol_type == "json") {
     boost::shared_ptr<TProtocolFactory> jsonProtocolFactory(new TJSONProtocolFactory());
-    protocolFactory = jsonProtocolFactory;
+    duplexProtocolFactory.reset(new TSingleProtocolFactory<TProtocolFactory>(jsonProtocolFactory));
+  } else if (protocol_type == "header") {
+    boost::shared_ptr<THeaderProtocolFactory> headerProtocolFactory(new THeaderProtocolFactory());
+    std::bitset<CLIENT_TYPES_LEN> clientTypes;
+    clientTypes[THRIFT_UNFRAMED_DEPRECATED] = 1;
+    clientTypes[THRIFT_FRAMED_DEPRECATED] = 1;
+    clientTypes[THRIFT_HEADER_CLIENT_TYPE] = 1;
+    clientTypes[THRIFT_HTTP_CLIENT_TYPE] = 1;
+    headerProtocolFactory->setClientTypes(clientTypes);
+    duplexProtocolFactory = headerProtocolFactory;
   } else {
     boost::shared_ptr<TProtocolFactory> binaryProtocolFactory(new TBinaryProtocolFactoryT<TBufferBase>());
-    protocolFactory = binaryProtocolFactory;
+    duplexProtocolFactory.reset(new TSingleProtocolFactory<TProtocolFactory>(binaryProtocolFactory));
   }
 
   // Processor
   boost::shared_ptr<TestHandler> testHandler(new TestHandler());
   boost::shared_ptr<ThriftTestProcessor> testProcessor(new ThriftTestProcessor(testHandler));
-  
+
   if (vm.count("processor-events")) {
     testProcessor->setEventHandler(boost::shared_ptr<TProcessorEventHandler>(
           new TestProcessorEventHandler()));
   }
-  
+
   // Transport
   boost::shared_ptr<TSSLSocketFactory> sslSocketFactory;
   boost::shared_ptr<TServerSocket> serverSocket;
@@ -595,29 +606,32 @@ int main(int argc, char **argv) {
     sslSocketFactory->ciphers("ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
     serverSocket = boost::shared_ptr<TServerSocket>(new TSSLServerSocket(port, sslSocketFactory));
   } else {
-	if (domain_socket != "") {
-	  unlink(domain_socket.c_str());
-	  serverSocket = boost::shared_ptr<TServerSocket>(new TServerSocket(domain_socket));
-	  port = 0;
-	}
-	else {
+    if (domain_socket != "") {
+      unlink(domain_socket.c_str());
+      serverSocket = boost::shared_ptr<TServerSocket>(new TServerSocket(domain_socket));
+      port = 0;
+    }
+    else {
       serverSocket = boost::shared_ptr<TServerSocket>(new TServerSocket(port));
-	}
+    }
   }
 
   // Factory
   boost::shared_ptr<TTransportFactory> transportFactory;
-  
+  boost::shared_ptr<TDuplexTransportFactory> duplexTransportFactory;
+
   if (transport_type == "http" && server_type != "nonblocking") {
-    boost::shared_ptr<TTransportFactory> httpTransportFactory(new THttpServerTransportFactory()); 
+    boost::shared_ptr<TTransportFactory> httpTransportFactory(new THttpServerTransportFactory());
     transportFactory = httpTransportFactory;
   } else if (transport_type == "framed") {
-    boost::shared_ptr<TTransportFactory> framedTransportFactory(new TFramedTransportFactory()); 
+    boost::shared_ptr<TTransportFactory> framedTransportFactory(new TFramedTransportFactory());
     transportFactory = framedTransportFactory;
   } else {
-    boost::shared_ptr<TTransportFactory> bufferedTransportFactory(new TBufferedTransportFactory()); 
+    boost::shared_ptr<TTransportFactory> bufferedTransportFactory(new TBufferedTransportFactory());
     transportFactory = bufferedTransportFactory;
   }
+
+  duplexTransportFactory.reset(new TSingleTransportFactory<TTransportFactory>(transportFactory));
 
   // Server Info
   cout << "Starting \"" << server_type << "\" server ("
@@ -631,8 +645,8 @@ int main(int argc, char **argv) {
   if (server_type == "simple") {
     TSimpleServer simpleServer(testProcessor,
                                serverSocket,
-                               transportFactory,
-                               protocolFactory);
+                               duplexTransportFactory,
+                               duplexProtocolFactory);
 
     simpleServer.serve();
 
@@ -650,8 +664,8 @@ int main(int argc, char **argv) {
 
     TThreadPoolServer threadPoolServer(testProcessor,
                                        serverSocket,
-                                       transportFactory,
-                                       protocolFactory,
+                                       duplexTransportFactory,
+                                       duplexProtocolFactory,
                                        threadManager);
 
     threadPoolServer.serve();
@@ -660,23 +674,23 @@ int main(int argc, char **argv) {
 
     TThreadedServer threadedServer(testProcessor,
                                    serverSocket,
-                                   transportFactory,
-                                   protocolFactory);
+                                   duplexTransportFactory,
+                                   duplexProtocolFactory);
 
     threadedServer.serve();
 
   } else if (server_type == "nonblocking") {
-    if(transport_type == "http") {
-      boost::shared_ptr<TestHandlerAsync> testHandlerAsync(new TestHandlerAsync(testHandler));
-      boost::shared_ptr<TAsyncProcessor> testProcessorAsync(new ThriftTestAsyncProcessor(testHandlerAsync));
-      boost::shared_ptr<TAsyncBufferProcessor> testBufferProcessor(new TAsyncProtocolProcessor(testProcessorAsync, protocolFactory));
-      
-      TEvhttpServer nonblockingServer(testBufferProcessor, port);
-      nonblockingServer.serve();
-} else {
-      TNonblockingServer nonblockingServer(testProcessor, port);
-      nonblockingServer.serve();
-    }
+    // if(transport_type == "http") {
+    //   boost::shared_ptr<TestHandlerAsync> testHandlerAsync(new TestHandlerAsync(testHandler));
+    //   boost::shared_ptr<TAsyncProcessor> testProcessorAsync(new ThriftTestAsyncProcessor(testHandlerAsync));
+    //   boost::shared_ptr<TAsyncBufferProcessor> testBufferProcessor(new TAsyncProtocolProcessor(testProcessorAsync, duplexProtocolFactory));
+
+    //   TEvhttpServer nonblockingServer(testBufferProcessor, port);
+    //   nonblockingServer.serve();
+    // } else {
+    //   TNonblockingServer nonblockingServer(testProcessor, port);
+    //   nonblockingServer.serve();
+    // }
   }
 
   cout << "done." << endl;
