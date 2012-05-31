@@ -141,10 +141,12 @@ void TThreadPoolServer::serve() {
       client = serverTransport_->accept();
 
       // Make IO transports
-      inputTransport = inputTransportFactory_->getTransport(client);
-      outputTransport = outputTransportFactory_->getTransport(client);
-      inputProtocol = inputProtocolFactory_->getProtocol(inputTransport);
-      outputProtocol = outputProtocolFactory_->getProtocol(outputTransport);
+      TTransportPair transports = duplexTransportFactory_->getTransport(client);
+      inputTransport = transports.first;
+      outputTransport = transports.second;
+      TProtocolPair protocols = duplexProtocolFactory_->getProtocol(transports);
+      inputProtocol = protocols.first;
+      outputProtocol = protocols.second;
 
       shared_ptr<TProcessor> processor = getProcessor(inputProtocol,
                                                       outputProtocol, client);

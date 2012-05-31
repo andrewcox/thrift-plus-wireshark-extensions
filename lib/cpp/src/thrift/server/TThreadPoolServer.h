@@ -68,15 +68,12 @@ class TThreadPoolServer : public TServer {
   TThreadPoolServer(
       const boost::shared_ptr<ProcessorFactory>& processorFactory,
       const boost::shared_ptr<TServerTransport>& serverTransport,
-      const boost::shared_ptr<TTransportFactory>& inputTransportFactory,
-      const boost::shared_ptr<TTransportFactory>& outputTransportFactory,
-      const boost::shared_ptr<TProtocolFactory>& inputProtocolFactory,
-      const boost::shared_ptr<TProtocolFactory>& outputProtocolFactory,
+      const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+      const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
       const boost::shared_ptr<ThreadManager>& threadManager,
-      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory)) :
+      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory)):
     TServer(processorFactory, serverTransport,
-            inputTransportFactory, outputTransportFactory,
-            inputProtocolFactory, outputProtocolFactory),
+            duplexTransportFactory, duplexProtocolFactory),
     threadManager_(threadManager),
     stop_(false),
     timeout_(0) {}
@@ -85,15 +82,12 @@ class TThreadPoolServer : public TServer {
   TThreadPoolServer(
       const boost::shared_ptr<Processor>& processor,
       const boost::shared_ptr<TServerTransport>& serverTransport,
-      const boost::shared_ptr<TTransportFactory>& inputTransportFactory,
-      const boost::shared_ptr<TTransportFactory>& outputTransportFactory,
-      const boost::shared_ptr<TProtocolFactory>& inputProtocolFactory,
-      const boost::shared_ptr<TProtocolFactory>& outputProtocolFactory,
+      const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+      const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
       const boost::shared_ptr<ThreadManager>& threadManager,
-      THRIFT_OVERLOAD_IF(Processor, TProcessor)) :
+      THRIFT_OVERLOAD_IF(Processor, TProcessor)):
     TServer(processor, serverTransport,
-            inputTransportFactory, outputTransportFactory,
-            inputProtocolFactory, outputProtocolFactory),
+            duplexTransportFactory, duplexProtocolFactory),
     threadManager_(threadManager),
     stop_(false),
     timeout_(0) {}

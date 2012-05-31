@@ -74,6 +74,7 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift::concurrency;
 using namespace std;
 using apache::thrift::transport::TSocket;
+using apache::thrift::transport::TTransportPair;
 using apache::thrift::transport::TTransportException;
 using boost::shared_ptr;
 
@@ -179,6 +180,9 @@ class TNonblockingServer::TConnection {
 
   /// Protocol encoder
   boost::shared_ptr<TProtocol> outputProtocol_;
+
+  /// True if this connection is using THeaderProtocol
+  bool headerProtocol_;
 
   /// Server event handler, if any
   boost::shared_ptr<TServerEventHandler> serverEventHandler_;
@@ -413,25 +417,19 @@ void TNonblockingServer::TConnection::init(int socket,
   callsForResize_ = 0;
 
   // get input/transports
-  factoryInputTransport_ = server_->getInputTransportFactory()->getTransport(
-    boost::shared_ptr<TTransport>(inputTransport_));
-  factoryOutputTransport_ = server_->getOutputTransportFactory()->getTransport(
-    boost::shared_ptr<TTransport>(outputTransport_));
-  if (!server_->getOutputProtocolFactory()) {
-    // Create protocol
-    THeaderProtocolFactory* protFactory =
-      dynamic_cast<THeaderProtocolFactory*>(
-        server_->getInputProtocolFactory().get());
-    inputProtocol_ = protFactory->getProtocol(factoryInputTransport_,
-                                              factoryOutputTransport_);
-    outputProtocol_ = inputProtocol_;
-  } else {
-    // Create protocol
-    inputProtocol_ = server_->getInputProtocolFactory()->getProtocol(
-      factoryInputTransport_);
-    outputProtocol_ = server_->getOutputProtocolFactory()->getProtocol(
-      factoryOutputTransport_);
-  }
+  shared_ptr<TDuplexTransportFactory> transFactory =
+    server_->getDuplexTransportFactory();
+  shared_ptr<TDuplexProtocolFactory> protFactory =
+    server_->getDuplexProtocolFactory();
+  TTransportPair transports = transFactory->getTransport(
+    TTransportPair(inputTransport_, outputTransport_));
+  factoryInputTransport_ = transports.first;
+  factoryOutputTransport_ = transports.second;
+  TProtocolPair protocols = protFactory->getProtocol(transports);
+  inputProtocol_ = protocols.first;
+  outputProtocol_ = protocols.second;
+  headerProtocol_ =
+    (dynamic_cast<THeaderProtocol *>(inputProtocol_.get()) != NULL);
 
   // Set up for any server event handler
   serverEventHandler_ = server_->getEventHandler();
@@ -589,7 +587,7 @@ void TNonblockingServer::TConnection::transition() {
   case APP_READ_REQUEST:
     // We are done reading the request, package the read buffer into transport
     // and get back some data from the dispatch function
-    if (!server_->getOutputProtocolFactory()) {
+    if (headerProtocol_) {
       // Keep the frame size 4 byte field, and send it to the underlying
       // transport.  THeaderTransport uses this to do bulk copying instead of
       // reading individual bytes.

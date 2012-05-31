@@ -320,8 +320,23 @@ class TNonblockingServer : public TServer {
 
     init(port);
 
-    setInputProtocolFactory(protocolFactory);
-    setOutputProtocolFactory(protocolFactory);
+    setProtocolFactory(protocolFactory);
+    setThreadManager(threadManager);
+  }
+
+  template<typename ProcessorFactory>
+  TNonblockingServer(
+      const boost::shared_ptr<ProcessorFactory>& processorFactory,
+      const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+      int port,
+      const boost::shared_ptr<ThreadManager>& threadManager =
+        boost::shared_ptr<ThreadManager>(),
+      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory)) :
+    TServer(processorFactory) {
+
+    init(port);
+
+    setDuplexProtocolFactory(duplexProtocolFactory);
     setThreadManager(threadManager);
   }
 
@@ -337,40 +352,14 @@ class TNonblockingServer : public TServer {
 
     init(port);
 
-    setInputProtocolFactory(protocolFactory);
-    setOutputProtocolFactory(protocolFactory);
-    setThreadManager(threadManager);
-  }
-
-  template<typename ProcessorFactory>
-  TNonblockingServer(
-      const boost::shared_ptr<ProcessorFactory>& processorFactory,
-      const boost::shared_ptr<TTransportFactory>& inputTransportFactory,
-      const boost::shared_ptr<TTransportFactory>& outputTransportFactory,
-      const boost::shared_ptr<TProtocolFactory>& inputProtocolFactory,
-      const boost::shared_ptr<TProtocolFactory>& outputProtocolFactory,
-      int port,
-      const boost::shared_ptr<ThreadManager>& threadManager =
-        boost::shared_ptr<ThreadManager>(),
-      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory)) :
-    TServer(processorFactory) {
-
-    init(port);
-
-    setInputTransportFactory(inputTransportFactory);
-    setOutputTransportFactory(outputTransportFactory);
-    setInputProtocolFactory(inputProtocolFactory);
-    setOutputProtocolFactory(outputProtocolFactory);
+    setProtocolFactory(protocolFactory);
     setThreadManager(threadManager);
   }
 
   template<typename Processor>
   TNonblockingServer(
       const boost::shared_ptr<Processor>& processor,
-      const boost::shared_ptr<TTransportFactory>& inputTransportFactory,
-      const boost::shared_ptr<TTransportFactory>& outputTransportFactory,
-      const boost::shared_ptr<TProtocolFactory>& inputProtocolFactory,
-      const boost::shared_ptr<TProtocolFactory>& outputProtocolFactory,
+      const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
       int port,
       const boost::shared_ptr<ThreadManager>& threadManager =
         boost::shared_ptr<ThreadManager>(),
@@ -379,10 +368,43 @@ class TNonblockingServer : public TServer {
 
     init(port);
 
-    setInputTransportFactory(inputTransportFactory);
-    setOutputTransportFactory(outputTransportFactory);
-    setInputProtocolFactory(inputProtocolFactory);
-    setOutputProtocolFactory(outputProtocolFactory);
+    setDuplexProtocolFactory(duplexProtocolFactory);
+    setThreadManager(threadManager);
+  }
+
+  template<typename ProcessorFactory>
+  TNonblockingServer(
+      const boost::shared_ptr<ProcessorFactory>& processorFactory,
+      const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+      const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+      int port,
+      const boost::shared_ptr<ThreadManager>& threadManager =
+        boost::shared_ptr<ThreadManager>(),
+      THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory)):
+    TServer(processorFactory) {
+
+    init(port);
+
+    setDuplexTransportFactory(duplexTransportFactory);
+    setDuplexProtocolFactory(duplexProtocolFactory);
+    setThreadManager(threadManager);
+  }
+
+  template<typename Processor>
+  TNonblockingServer(
+      const boost::shared_ptr<Processor>& processor,
+      const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+      const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+      int port,
+      const boost::shared_ptr<ThreadManager>& threadManager =
+        boost::shared_ptr<ThreadManager>(),
+      THRIFT_OVERLOAD_IF(Processor, TProcessor)):
+    TServer(processor) {
+
+    init(port);
+
+    setDuplexTransportFactory(duplexTransportFactory);
+    setDuplexProtocolFactory(duplexProtocolFactory);
     setThreadManager(threadManager);
   }
 

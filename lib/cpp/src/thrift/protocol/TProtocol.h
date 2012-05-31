@@ -661,7 +661,7 @@ class TProtocol {
   }
 
  protected:
-  TProtocol(boost::shared_ptr<TTransport> ptrans):
+  explicit TProtocol(boost::shared_ptr<TTransport> ptrans):
     ptrans_(ptrans) {
   }
 
@@ -672,7 +672,7 @@ class TProtocol {
 };
 
 /**
- * Constructs input and output protocol objects given transports.
+ * Constructs protocol objects given transports.
  */
 class TProtocolFactory {
  public:
@@ -681,6 +681,96 @@ class TProtocolFactory {
   virtual ~TProtocolFactory() {}
 
   virtual boost::shared_ptr<TProtocol> getProtocol(boost::shared_ptr<TTransport> trans) = 0;
+};
+
+/**
+ * Constructs both input and output protocol objects with a given pair of
+ * input and output transports.
+ *
+ * TProtocolPair.first = Input Protocol
+ * TProtocolPair.second = Output Protocol
+ */
+typedef std::pair<boost::shared_ptr<TProtocol>,
+                  boost::shared_ptr<TProtocol> > TProtocolPair;
+
+class TDuplexProtocolFactory {
+ public:
+  TDuplexProtocolFactory() {}
+
+  virtual ~TDuplexProtocolFactory() {}
+
+  virtual TProtocolPair getProtocol(transport::TTransportPair transports) = 0;
+
+  virtual boost::shared_ptr<TProtocolFactory> getInputProtocolFactory() {
+    return boost::shared_ptr<TProtocolFactory>();
+  }
+
+  virtual boost::shared_ptr<TProtocolFactory> getOutputProtocolFactory() {
+    return boost::shared_ptr<TProtocolFactory>();
+  }
+};
+
+/**
+ * Adapts a TProtocolFactory to a TDuplexProtocolFactory that returns
+ * a new protocol object for both input and output
+ */
+template <class Factory_>
+class TSingleProtocolFactory : public TDuplexProtocolFactory {
+ public:
+  TSingleProtocolFactory() {
+    factory_.reset(new Factory_());
+  }
+
+  explicit TSingleProtocolFactory(boost::shared_ptr<Factory_> factory) :
+      factory_(factory) {}
+
+  virtual TProtocolPair getProtocol(transport::TTransportPair transports) {
+    return std::make_pair(factory_->getProtocol(transports.first),
+                          factory_->getProtocol(transports.second));
+  }
+
+  virtual boost::shared_ptr<TProtocolFactory> getInputProtocolFactory() {
+    return factory_;
+  }
+
+  virtual boost::shared_ptr<TProtocolFactory> getOutputProtocolFactory() {
+    return factory_;
+  }
+
+ private:
+
+  boost::shared_ptr<Factory_> factory_;
+};
+
+/**
+ * Use TDualProtocolFactory to construct input and output protocols from
+ * different factories.
+ */
+class TDualProtocolFactory : public TDuplexProtocolFactory {
+ public:
+  TDualProtocolFactory(
+    boost::shared_ptr<TProtocolFactory> inputFactory,
+    boost::shared_ptr<TProtocolFactory> outputFactory) :
+      inputFactory_(inputFactory),
+      outputFactory_(outputFactory) {}
+
+  virtual TProtocolPair getProtocol(transport::TTransportPair transports) {
+    return std::make_pair(inputFactory_->getProtocol(transports.first),
+                          outputFactory_->getProtocol(transports.second));
+  }
+
+  virtual boost::shared_ptr<TProtocolFactory> getInputProtocolFactory() {
+    return inputFactory_;
+  }
+
+  virtual boost::shared_ptr<TProtocolFactory> getOutputProtocolFactory() {
+    return outputFactory_;
+  }
+
+ private:
+
+  boost::shared_ptr<TProtocolFactory> inputFactory_;
+  boost::shared_ptr<TProtocolFactory> outputFactory_;
 };
 
 /**

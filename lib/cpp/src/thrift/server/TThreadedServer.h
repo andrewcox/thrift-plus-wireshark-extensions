@@ -55,6 +55,15 @@ class TThreadedServer : public TServer {
                   const boost::shared_ptr<ThreadFactory>& threadFactory,
                   THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory));
 
+  template<typename ProcessorFactory>
+  TThreadedServer(
+    const boost::shared_ptr<ProcessorFactory>& processorFactory,
+    const boost::shared_ptr<TServerTransport>& serverTransport,
+    const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+    const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+    const boost::shared_ptr<ThreadFactory>& threadFactory,
+    THRIFT_OVERLOAD_IF(ProcessorFactory, TProcessorFactory));
+
   template<typename Processor>
   TThreadedServer(const boost::shared_ptr<Processor>& processor,
                   const boost::shared_ptr<TServerTransport>& serverTransport,
@@ -69,6 +78,23 @@ class TThreadedServer : public TServer {
                   const boost::shared_ptr<TProtocolFactory>& protocolFactory,
                   const boost::shared_ptr<ThreadFactory>& threadFactory,
                   THRIFT_OVERLOAD_IF(Processor, TProcessor));
+
+  template<typename Processor>
+  TThreadedServer(
+    const boost::shared_ptr<Processor>& processor,
+    const boost::shared_ptr<TServerTransport>& serverTransport,
+    const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+    const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+    THRIFT_OVERLOAD_IF(Processor, TProcessor));
+
+  template<typename Processor>
+  TThreadedServer(
+    const boost::shared_ptr<Processor>& processor,
+    const boost::shared_ptr<TServerTransport>& serverTransport,
+    const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+    const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+    const boost::shared_ptr<ThreadFactory>& threadFactory,
+    THRIFT_OVERLOAD_IF(Processor, TProcessor));
 
   virtual ~TThreadedServer();
 
@@ -116,6 +142,20 @@ TThreadedServer::TThreadedServer(
   init();
 }
 
+template<typename ProcessorFactory>
+TThreadedServer::TThreadedServer(
+  const boost::shared_ptr<ProcessorFactory>& processorFactory,
+  const boost::shared_ptr<TServerTransport>& serverTransport,
+  const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+  const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+  const boost::shared_ptr<ThreadFactory>& threadFactory,
+  THRIFT_OVERLOAD_IF_DEFN(ProcessorFactory, TProcessorFactory)):
+    TServer(processorFactory, serverTransport, duplexTransportFactory,
+            duplexProtocolFactory),
+    threadFactory_(threadFactory) {
+  init();
+}
+
 template<typename Processor>
 TThreadedServer::TThreadedServer(
     const boost::shared_ptr<Processor>& processor,
@@ -137,6 +177,32 @@ TThreadedServer::TThreadedServer(
     THRIFT_OVERLOAD_IF_DEFN(Processor, TProcessor)) :
   TServer(processor, serverTransport, transportFactory, protocolFactory),
   threadFactory_(threadFactory) {
+  init();
+}
+
+template<typename Processor>
+TThreadedServer::TThreadedServer(
+  const boost::shared_ptr<Processor>& processor,
+  const boost::shared_ptr<TServerTransport>& serverTransport,
+  const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+  const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+  THRIFT_OVERLOAD_IF_DEFN(Processor, TProcessor)) :
+    TServer(processor, serverTransport, duplexTransportFactory,
+            duplexProtocolFactory) {
+  init();
+}
+
+template<typename Processor>
+TThreadedServer::TThreadedServer(
+  const boost::shared_ptr<Processor>& processor,
+  const boost::shared_ptr<TServerTransport>& serverTransport,
+  const boost::shared_ptr<TDuplexTransportFactory>& duplexTransportFactory,
+  const boost::shared_ptr<TDuplexProtocolFactory>& duplexProtocolFactory,
+  const boost::shared_ptr<ThreadFactory>& threadFactory,
+  THRIFT_OVERLOAD_IF_DEFN(Processor, TProcessor)):
+    TServer(processor, serverTransport, duplexTransportFactory,
+            duplexProtocolFactory),
+    threadFactory_(threadFactory) {
   init();
 }
 

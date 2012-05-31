@@ -265,6 +265,89 @@ class TTransportFactory {
 
 };
 
+/**
+ * A duplex transport factory used to make input and output transports in a
+ * single call.  This can be used to ensure the input and output transports
+ * are the pointers to the same object, for example.
+ *
+ * TTransportPair.first = Input Transport
+ * TTransportPair.second = Output Transport
+ */
+typedef std::pair<boost::shared_ptr<TTransport>,
+                  boost::shared_ptr<TTransport> > TTransportPair;
+
+class TDuplexTransportFactory {
+ public:
+  TDuplexTransportFactory() {}
+
+  virtual ~TDuplexTransportFactory() {}
+
+  virtual TTransportPair getTransport(boost::shared_ptr<TTransport> trans) {
+    return std::make_pair(trans, trans);
+  }
+
+  virtual TTransportPair getTransport(TTransportPair transports) {
+    return std::make_pair(transports.first, transports.second);
+  }
+
+};
+
+/**
+ * Adapts a TTransportFactory to a TDuplexTransportFactory that returns
+ * a new transport object for both input and output
+ */
+template <class Factory_>
+class TSingleTransportFactory : public TDuplexTransportFactory {
+ public:
+  TSingleTransportFactory() {
+    factory_.reset(new Factory_());
+  }
+
+  explicit TSingleTransportFactory(
+    boost::shared_ptr<Factory_> factory) :
+      factory_(factory) {}
+
+  virtual TTransportPair getTransport(boost::shared_ptr<TTransport> trans) {
+    return std::make_pair(factory_->getTransport(trans),
+                          factory_->getTransport(trans));
+  }
+
+  virtual TTransportPair getTransport(TTransportPair transports) {
+    return std::make_pair(factory_->getTransport(transports.first),
+                          factory_->getTransport(transports.second));
+  }
+ private:
+
+  boost::shared_ptr<Factory_> factory_;
+};
+
+/**
+ * Use TDualTransportFactory to construct input and output transports from
+ * different factories.
+ */
+class TDualTransportFactory : public TDuplexTransportFactory {
+ public:
+  TDualTransportFactory(
+    boost::shared_ptr<TTransportFactory> inputFactory,
+    boost::shared_ptr<TTransportFactory> outputFactory) :
+      inputFactory_(inputFactory),
+      outputFactory_(outputFactory) {}
+
+  virtual TTransportPair getTransport(boost::shared_ptr<TTransport> trans) {
+    return std::make_pair(inputFactory_->getTransport(trans),
+                          outputFactory_->getTransport(trans));
+  }
+
+  virtual TTransportPair getTransport(TTransportPair transports) {
+    return std::make_pair(inputFactory_->getTransport(transports.first),
+                          outputFactory_->getTransport(transports.second));
+  }
+ private:
+
+  boost::shared_ptr<TTransportFactory> inputFactory_;
+  boost::shared_ptr<TTransportFactory> outputFactory_;
+};
+
 }}} // apache::thrift::transport
 
 #endif // #ifndef _THRIFT_TRANSPORT_TTRANSPORT_H_

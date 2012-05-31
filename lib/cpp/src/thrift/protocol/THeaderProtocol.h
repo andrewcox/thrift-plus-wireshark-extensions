@@ -30,6 +30,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
 using apache::thrift::transport::THeaderTransport;
+using apache::thrift::transport::TTransportPair;
 
 namespace apache { namespace thrift { namespace protocol {
 
@@ -44,8 +45,8 @@ class THeaderProtocol
  public:
   void resetProtocol();
 
-  THeaderProtocol(const boost::shared_ptr<TTransport>& trans,
-                  std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
+  explicit THeaderProtocol(const boost::shared_ptr<TTransport>& trans,
+                           std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL) :
       TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(trans,
                                                                              clientTypes))
     , trans_((THeaderTransport*)this->getTransport().get())
@@ -221,8 +222,12 @@ class THeaderProtocol
 
 /**
  * Constructs header protocol handlers
+ *
+ * TODO(afrind): Cob clients in their current instantiation cannot use
+ * THeaderProtocol because the only ctor takes a straight-up TProtocolFactory
+ * rather than duplex.  Add new ctors?  Or create an adapter?
  */
-class THeaderProtocolFactory : public TProtocolFactory {
+class THeaderProtocolFactory : public TDuplexProtocolFactory {
  public:
   THeaderProtocolFactory() {}
 
@@ -234,20 +239,24 @@ class THeaderProtocolFactory : public TProtocolFactory {
     }
   }
 
-  virtual boost::shared_ptr<TProtocol> getProtocol(
+  virtual TProtocolPair getProtocol(
       boost::shared_ptr<transport::TTransport> trans) {
     TProtocol* prot = new THeaderProtocol(trans, &clientTypes);
 
-    return boost::shared_ptr<TProtocol>(prot);
+    boost::shared_ptr<TProtocol> pprot(prot);
+    return TProtocolPair(pprot, pprot);
   }
 
-  virtual boost::shared_ptr<TProtocol> getProtocol(
-      boost::shared_ptr<transport::TTransport> inTrans,
-      boost::shared_ptr<transport::TTransport> outTrans) {
-    TProtocol* prot = new THeaderProtocol(inTrans, outTrans, &clientTypes);
+  virtual TProtocolPair getProtocol(TTransportPair transports) {
+    TProtocol* prot = new THeaderProtocol(transports.first,
+                                          transports.second, &clientTypes);
 
-    return boost::shared_ptr<TProtocol>(prot);
+    boost::shared_ptr<TProtocol> pprot(prot);
+    return TProtocolPair(pprot, pprot);
   }
+
+  // No implementation of getInputProtocolFactory/getOutputProtocolFactory
+  // Using base class implementation which return NULL.
 
  private:
   std::bitset<CLIENT_TYPES_LEN> clientTypes;
