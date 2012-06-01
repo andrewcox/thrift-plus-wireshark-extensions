@@ -65,10 +65,11 @@ class THeaderProtocol
                   const boost::shared_ptr<TTransport>& outTrans,
                   std::bitset<CLIENT_TYPES_LEN>* clientTypes = NULL,
                   uint16_t protoId = T_COMPACT_PROTOCOL) :
-      TVirtualProtocol<THeaderProtocol>(boost::make_shared<THeaderTransport>(inTrans,
-									     outTrans,
-									     clientTypes))
-      , trans_((THeaderTransport*)this->getTransport().get())
+      TVirtualProtocol<THeaderProtocol>(getInOutTransportWrapper(inTrans,
+                                                                 outTrans,
+                                                                 clientTypes))
+      , trans_(boost::dynamic_pointer_cast<THeaderTransport, TTransport>(
+                 this->getTransport()))
       , protoId_(protoId)
     {
       trans_->setProtocolId(protoId);
@@ -235,6 +236,16 @@ class THeaderProtocol
     } else {
       return boost::make_shared<THeaderTransport>(trans, clientTypes);
     }
+  }
+
+  boost::shared_ptr<TTransport> getInOutTransportWrapper(
+    const boost::shared_ptr<TTransport>& inTrans,
+    const boost::shared_ptr<TTransport>& outTrans,
+    std::bitset<CLIENT_TYPES_LEN>* clientTypes) {
+    assert(dynamic_cast<THeaderTransport*>(inTrans.get()) == NULL
+        && dynamic_cast<THeaderTransport*>(outTrans.get()) == NULL);
+
+    return boost::make_shared<THeaderTransport>(inTrans, outTrans, clientTypes);
   }
 
   boost::shared_ptr<THeaderTransport> trans_;
