@@ -118,6 +118,10 @@ class THeaderProtocol
     return trans_->getHeaders();
   }
 
+  void setTransform(uint16_t trans) {
+    trans_->setTransform(trans);
+  }
+
   std::string getPeerIdentity() const {
     return trans_->getPeerIdentity();
   }
@@ -258,12 +262,20 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
     }
   }
 
+  void setTransform(uint16_t trans) {
+    trans_.push_back(trans);
+  }
+
   virtual TProtocolPair getProtocol(
       boost::shared_ptr<transport::TTransport> trans) {
     THeaderProtocol* prot = new THeaderProtocol(trans, &clientTypes, protoId_);
 
     if(disableIdentity_) {
       prot->setIdentity("");
+    }
+
+    for (auto& t : trans_) {
+      prot->setTransform(t);
     }
 
     boost::shared_ptr<TProtocol> pprot(prot);
@@ -280,6 +292,10 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
       prot->setIdentity("");
     }
 
+    for (auto& t : trans_) {
+      prot->setTransform(t);
+    }
+
     boost::shared_ptr<TProtocol> pprot(prot);
     return TProtocolPair(pprot, pprot);
   }
@@ -291,6 +307,7 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
   std::bitset<CLIENT_TYPES_LEN> clientTypes;
   uint16_t protoId_;
   bool disableIdentity_;
+  std::vector<uint16_t> trans_;
 };
 
 }}} // apache::thrift::protocol
