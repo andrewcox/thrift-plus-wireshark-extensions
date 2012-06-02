@@ -2269,6 +2269,7 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
       indent() << "}" << endl;
 
   } else /* if (style == "Cob") */ {
+    /* Generate TProtocolFactory* constructor */
     f_header_ <<
       indent() << service_name_ << style << "Client" << short_suffix << "(" <<
       "boost::shared_ptr< ::apache::thrift::async::TAsyncChannel> channel, " <<
@@ -2306,6 +2307,61 @@ void t_cpp_generator::generate_service_client(t_service* tservice, string style)
         indent() << "  iprot_ = piprot_.get();" << endl <<
         indent() << "  oprot_ = poprot_.get();" << endl <<
         indent() << "}" << endl;
+    } else {
+      f_header_ <<
+        indent() << "  " << extends << style << client_suffix <<
+        "(channel, protocolFactory) {}" << endl;
+    }
+
+    /* Generate TDuplexProtocolFactory* constructor */
+    f_header_ <<
+      indent() << service_name_ << style << "Client" << short_suffix << "(" <<
+      "boost::shared_ptr<apache::thrift::async::TAsyncChannel> channel, " <<
+      "apache::thrift::protocol::TDuplexProtocolFactory* protocolFactory) :" <<
+      endl;
+    if (extends.empty()) {
+      f_header_ <<
+        indent() << "  channel_(channel)," << endl <<
+        indent() <<
+        "  itrans_(new apache::thrift::transport::TMemoryBuffer())," << endl <<
+        indent() <<
+        "  otrans_(new apache::thrift::transport::TMemoryBuffer()) {" << endl;
+
+      f_header_ <<
+        indent() <<
+        "  apache::thrift::transport::TTransportPair tpair = std::make_pair(itrans_, otrans_);" << endl <<
+        indent() <<
+        "  apache::thrift::protocol::TProtocolPair ppair = protocolFactory->getProtocol(tpair);" << endl;
+      if (gen_templates_) {
+        // TDuplexProtocolFactory classes return generic TProtocol pointers.
+        // We have to dynamic cast to the Protocol_ type we are expecting.
+        f_header_ <<
+          indent() << "  piprot_ = boost::dynamic_pointer_cast<Protocol_>(" <<
+          "ppair.first);" << endl <<
+          indent() << "  poprot_ = boost::dynamic_pointer_cast<Protocol_>(" <<
+          "ppair.second);" << endl;
+        // Throw a TException if either dynamic cast failed.
+        f_header_ <<
+          indent() << "  if (!piprot_ || !poprot_) {" << endl <<
+          indent() << "    throw apache::thrift::TException(\"" <<
+          "TDuplexProtocolFactory returned unexpected protocol type in " <<
+          service_name_ << style << "Client" << short_suffix <<
+          " constructor\");" << endl <<
+          indent() << "  }" << endl;
+      } else {
+        f_header_ <<
+          indent() << "  piprot_ = ppair.first;" <<
+          endl <<
+          indent() << "  poprot_ = ppair.second;" <<
+          endl;
+      }
+      f_header_ <<
+        indent() <<
+        "  iprot_ = piprot_.get();" << endl <<
+        indent() <<
+        "  oprot_ = poprot_.get();" << endl <<
+        indent() <<
+        "}" << endl;
     } else {
       f_header_ <<
         indent() << "  " << extends << style << client_suffix <<

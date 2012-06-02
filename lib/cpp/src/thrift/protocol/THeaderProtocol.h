@@ -233,7 +233,11 @@ class THeaderProtocol
  */
 class THeaderProtocolFactory : public TDuplexProtocolFactory {
  public:
-  THeaderProtocolFactory() {}
+  explicit THeaderProtocolFactory(uint16_t protoId = T_COMPACT_PROTOCOL,
+                                  bool disableIdentity = false) {
+    protoId_ = protoId;
+    disableIdentity_ = disableIdentity;
+  }
 
   virtual ~THeaderProtocolFactory() {}
 
@@ -245,15 +249,25 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
 
   virtual TProtocolPair getProtocol(
       boost::shared_ptr<transport::TTransport> trans) {
-    TProtocol* prot = new THeaderProtocol(trans, &clientTypes);
+    THeaderProtocol* prot = new THeaderProtocol(trans, &clientTypes, protoId_);
+
+    if(disableIdentity_) {
+      prot->setIdentity("");
+    }
 
     boost::shared_ptr<TProtocol> pprot(prot);
     return TProtocolPair(pprot, pprot);
   }
 
   virtual TProtocolPair getProtocol(TTransportPair transports) {
-    TProtocol* prot = new THeaderProtocol(transports.first,
-                                          transports.second, &clientTypes);
+    THeaderProtocol* prot = new THeaderProtocol(transports.first,
+                                          transports.second,
+                                          &clientTypes,
+                                          protoId_);
+
+    if(disableIdentity_) {
+      prot->setIdentity("");
+    }
 
     boost::shared_ptr<TProtocol> pprot(prot);
     return TProtocolPair(pprot, pprot);
@@ -264,35 +278,8 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
 
  private:
   std::bitset<CLIENT_TYPES_LEN> clientTypes;
-};
-
-
-/**
- * Protocol factory for header clients (notably Cob clients).
- * The input and ouput protocol objects will be different in this case, but
- * no functionality depends on them being the same at present.
- */
-class THeaderClientProtocolFactory : public TProtocolFactory {
- private:
   uint16_t protoId_;
   bool disableIdentity_;
-
- public:
-  explicit THeaderClientProtocolFactory(uint16_t protoId = T_COMPACT_PROTOCOL,
-                                        bool disableIdentity = false) {
-    protoId_ = protoId;
-    disableIdentity_ = disableIdentity;
-  }
-
-  virtual boost::shared_ptr<TProtocol> getProtocol(
-      boost::shared_ptr<transport::TTransport> trans) {
-    THeaderProtocol *headerProtocol = new THeaderProtocol(trans, NULL,
-                                                          protoId_);
-    if (disableIdentity_) {
-      headerProtocol->setIdentity("");
-    }
-    return boost::shared_ptr<TProtocol>(headerProtocol);
-  }
 };
 
 }}} // apache::thrift::protocol
