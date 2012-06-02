@@ -235,6 +235,7 @@ class THeaderTransport
   enum TRANSFORMS {
     ZLIB_TRANSFORM = 0x01,
     HMAC_TRANSFORM = 0x02,
+    // reserved: SNAPPY_TRANSFORM = 0x03,
   };
 
   /**
