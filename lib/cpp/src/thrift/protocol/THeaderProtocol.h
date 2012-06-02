@@ -274,8 +274,10 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
       prot->setIdentity("");
     }
 
-    for (auto& t : trans_) {
-      prot->setTransform(t);
+    for (std::vector<uint16_t>::iterator it = trans_.begin();
+	 it != trans_.end();
+	 it++) {
+      prot->setTransform(*it);
     }
 
     boost::shared_ptr<TProtocol> pprot(prot);
@@ -292,8 +294,10 @@ class THeaderProtocolFactory : public TDuplexProtocolFactory {
       prot->setIdentity("");
     }
 
-    for (auto& t : trans_) {
-      prot->setTransform(t);
+    for (std::vector<uint16_t>::iterator it = trans_.begin();
+	 it != trans_.end();
+	 it++) {
+      prot->setTransform(*it);
     }
 
     boost::shared_ptr<TProtocol> pprot(prot);
