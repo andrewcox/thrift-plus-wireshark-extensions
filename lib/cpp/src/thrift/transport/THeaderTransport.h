@@ -33,8 +33,12 @@
 #include "boost/scoped_array.hpp"
 #include <pwd.h>
 
+namespace apache { namespace thrift { namespace transport {
+
+using apache::thrift::protocol::T_COMPACT_PROTOCOL;
+
 // Don't include the unknown client.
-#define CLIENT_TYPES_LEN 4
+const int CLIENT_TYPES_LEN = 4;
 
 enum CLIENT_TYPE {
   THRIFT_HEADER_CLIENT_TYPE = 0,
@@ -43,10 +47,6 @@ enum CLIENT_TYPE {
   THRIFT_HTTP_CLIENT_TYPE = 3,
   THRIFT_UNKNOWN_CLIENT_TYPE = 4,
 };
-
-namespace apache { namespace thrift { namespace transport {
-
-using apache::thrift::protocol::T_COMPACT_PROTOCOL;
 
 /**
  * Header transport. All writes go into an in-memory buffer until flush is
