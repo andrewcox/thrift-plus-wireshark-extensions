@@ -62,6 +62,18 @@ class THttpTransport : public TVirtualTransport<THttpTransport> {
 
   virtual void flush() = 0;
 
+  uint32_t getReadOffset() {
+    return httpPos_;
+  }
+
+  uint32_t getBytesConsumed() {
+    return bytesConsumed_;
+  }
+
+  uint32_t getContentBegin() {
+    return contentBegin_;
+  }
+
  protected:
 
   boost::shared_ptr<TTransport> transport_;
@@ -100,6 +112,9 @@ class THttpTransport : public TVirtualTransport<THttpTransport> {
 
   static const char* CRLF;
   static const int CRLF_LEN;
+
+  int bytesConsumed_;
+  int contentBegin_;
 };
 
 }}} // apache::thrift::transport

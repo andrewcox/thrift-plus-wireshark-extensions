@@ -37,7 +37,9 @@ THttpTransport::THttpTransport(boost::shared_ptr<TTransport> transport) :
   httpBuf_(NULL),
   httpPos_(0),
   httpBufLen_(0),
-  httpBufSize_(1024) {
+  httpBufSize_(1024),
+  bytesConsumed_(0),
+  contentBegin_(0) {
   init();
 }
 
@@ -63,6 +65,7 @@ uint32_t THttpTransport::read(uint8_t* buf, uint32_t len) {
       return 0;
     }
   }
+  bytesConsumed_ += len;
   return readBuffer_.read(buf, len);
 }
 
@@ -85,6 +88,8 @@ uint32_t THttpTransport::readMoreData() {
   if (readHeaders_) {
     readHeaders();
   }
+
+  contentBegin_ = bytesConsumed_;
 
   if (chunked_) {
     size = readChunked();
@@ -171,7 +176,9 @@ char* THttpTransport::readLine() {
       // Return pointer to next line
       *eol = '\0';
       char* line = httpBuf_+httpPos_;
+      bytesConsumed_ += (eol - (httpBuf_+httpPos_));
       httpPos_ = static_cast<uint32_t>((eol-httpBuf_) + CRLF_LEN);
+      bytesConsumed_ += CRLF_LEN;
       return line;
     }
   }

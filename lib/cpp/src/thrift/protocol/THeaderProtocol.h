@@ -31,8 +31,11 @@
 #include <boost/make_shared.hpp>
 using apache::thrift::transport::THeaderTransport;
 using apache::thrift::transport::TTransportPair;
+using apache::thrift::transport::CLIENT_TYPES_LEN;
+using apache::thrift::transport::CLIENT_TYPE;
 
 namespace apache { namespace thrift { namespace protocol {
+
 
 /**
  * The header protocol for thrift. Reads unframed, framed, header format,

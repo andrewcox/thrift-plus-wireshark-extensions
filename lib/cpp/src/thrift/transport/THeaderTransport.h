@@ -26,6 +26,7 @@
 #include <thrift/protocol/TProtocolTypes.h>
 #include "TBufferTransports.h"
 #include "THttpServer.h"
+#include "THttpClient.h"
 #include "TTransport.h"
 #include "TVirtualTransport.h"
 
@@ -263,6 +264,19 @@ class THeaderTransport
   }
 
  protected:
+  /// Constructor for subclassing.
+  THeaderTransport()
+    : protoId(T_COMPACT_PROTOCOL)
+    , clientType(THRIFT_HEADER_CLIENT_TYPE)
+    , seqId(0)
+    , flags(0)
+    , identity(s_identity)
+    , tBufSize_(0)
+    , tBuf_(NULL)
+  {
+    initBuffers();
+    initSupportedClients(NULL);
+  }
 
   std::bitset<CLIENT_TYPES_LEN> supported_clients;
 
@@ -292,6 +306,8 @@ class THeaderTransport
   static const uint32_t HEADER_MASK = 0xFFFF0000;
   static const uint32_t FLAGS_MASK = 0x0000FFFF;
   static const uint32_t HTTP_MAGIC = 0x504F5354; // POST
+  static const uint32_t HTTP_REQUEST_MAGIC = 0x504F5354; // POST
+  static const uint32_t HTTP_RESPONSE_MAGIC = 0x48545450; // HTTP
 
   static const uint32_t MAX_FRAME_SIZE = 0x3FFFFFFF;
 

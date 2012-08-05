@@ -136,7 +136,7 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
     } else {
       setReadBuffer(rBuf_.get(), 4);
     }
-  } else if (sz == HTTP_MAGIC) {
+  } else if (sz == HTTP_REQUEST_MAGIC) {
     clientType = THRIFT_HTTP_CLIENT_TYPE;
 
     // Transports don't support readahead, so put back the szN we read
@@ -145,6 +145,15 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
       new TBufferedTransport(transport_));
     bufferedTrans->putBack(reinterpret_cast<uint8_t*>(&szN), sizeof(szN));
     httpTransport_ = shared_ptr<TTransport>(new THttpServer(bufferedTrans));
+  } else if (sz == HTTP_RESPONSE_MAGIC) {
+    clientType = THRIFT_HTTP_CLIENT_TYPE;
+
+    // Transports don't support readahead, so put back the szN we read
+    // off the wire for httpTransport_ to read.  It was probably 'HTTP'.
+    shared_ptr<TBufferedTransport> bufferedTrans(
+      new TBufferedTransport(transport_));
+    bufferedTrans->putBack(reinterpret_cast<uint8_t*>(&szN), sizeof(szN));
+    httpTransport_ = shared_ptr<TTransport>(new THttpClient(bufferedTrans, "localhost"));
   } else {
     // Could be header format or framed. Check next uint32
     uint32_t magic_n;
